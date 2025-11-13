@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 const scene = new THREE.Scene();
 
@@ -9,6 +10,10 @@ camera.lookAt(0, 0, 0);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
+
+const controls = new OrbitControls(camera, renderer.domElement);
+camera.position.set(0, 10, 20);
+controls.target.set(0, 0, 0);
 
 ///// Transformation Matrices /////
 function translationMatrix(tx, ty, tz) {
@@ -50,7 +55,7 @@ function rotationMatrixZ(theta) {
 
 // Operating table
 const table_geometry = new THREE.BoxGeometry( 10, 1, 20 );
-const table_material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+const table_material = new THREE.MeshBasicMaterial( { color: 0x777b7e } );
 const table = new THREE.Mesh( table_geometry, table_material );
 scene.add( table );
 
@@ -148,3 +153,27 @@ function createGouraudMaterial(materialProperties) {
         uniforms: uniforms
     });
 }
+
+// Handle window resize
+window.addEventListener('resize', onWindowResize, false);
+
+// Handle keyboard input
+document.addEventListener('keydown', onKeyDown, false);
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function onKeyDown(event){
+    switch(event.keyCode) {
+
+    }
+}
+
+function animate() {
+    controls.update();
+	renderer.render( scene, camera );
+}
+renderer.setAnimationLoop( animate );
