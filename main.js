@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+<<<<<<< HEAD
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { MeshLineGeometry, MeshLineMaterial } from 'meshline';
 
+=======
+>>>>>>> 5f042c8 (scalpel)
 
 const scene = new THREE.Scene();
 let clock = new THREE.Clock();
@@ -72,6 +75,7 @@ function rotationMatrixZ(theta) {
     );
 }
 
+<<<<<<< HEAD
 function scaleMatrix(sx, sy, sz) {
 	return new THREE.Matrix4().set(
 		sx, 0, 0, 0,
@@ -149,15 +153,36 @@ floor.applyMatrix4(floortransform);
 
 //////////////////////////////////
 
+=======
+function scalingMatrix( sx, sy, sz ) {
+    return new THREE.Matrix4().set(
+        sx, 0, 0, 0,
+        0, sy, 0, 0,
+        0, 0, sz, 0,
+        0, 0, 0, 1
+    );
+}
+
+let attachedObject = null;
+let tools = [];
+>>>>>>> 5f042c8 (scalpel)
 
 //////////////////////////////////
+///////////// Meshes /////////////
 
 // Operating table
+<<<<<<< HEAD
 const table_geometry = new THREE.BoxGeometry( 10, 1, 20 );
 const table_material = new THREE.MeshPhongMaterial( { color: 0xADD8E6, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 
 const table = new THREE.Mesh( table_geometry, table_material );
 scene.add( table );
+=======
+const table = new THREE.Group()
+const tabletop_geometry = new THREE.BoxGeometry( 10, 1, 20 );
+const table_material = new THREE.MeshBasicMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+const tabletop = new THREE.Mesh( tabletop_geometry, table_material );
+>>>>>>> 5f042c8 (scalpel)
 
 const leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 7, 32 );
 const leg1 = new THREE.Mesh( leg_geometry, table_material );
@@ -165,11 +190,33 @@ const leg2 = new THREE.Mesh( leg_geometry, table_material );
 const leg3 = new THREE.Mesh( leg_geometry, table_material );
 const leg4 = new THREE.Mesh( leg_geometry, table_material );
 
+<<<<<<< HEAD
 leg1.position.set(4.5, -3, -9.5);
 leg2.position.set(-4.5, -3, -9.5);
 leg3.position.set(4.5, -3, 9.5);
 leg4.position.set(-4.5, -3, 9.5);
 scene.add( leg1, leg2, leg3, leg4 );
+=======
+leg1.position.set(4.5, -5, -9.5);
+leg2.position.set(-4.5, -5, -9.5);
+leg3.position.set(4.5, -5, 9.5);
+leg4.position.set(-4.5, -5, 9.5);
+table.add(tabletop, leg1, leg2, leg3, leg4);
+scene.add( table );
+
+// Load objects
+const loader = new OBJLoader();
+const scalpel = await loader.loadAsync( 'models/scalpel.obj' );
+scalpel.scale.setScalar(0.3);
+scalpel.position.set(7, 0, 0);
+scene.add( scalpel );
+
+
+tools = [
+    {mesh: scalpel}
+];
+
+>>>>>>> 5f042c8 (scalpel)
 
 //////////////////////////////////
 
@@ -673,13 +720,17 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+<<<<<<< HEAD
 let attachedObject = null;
 
+=======
+>>>>>>> 5f042c8 (scalpel)
 function moveTool(keyCode){
     if ( attachedObject == null | attachedObject >= tools.length )
         return;
     switch (keyCode) {
         case 37:
+<<<<<<< HEAD
             tools[attachedObject].mesh.translateX(-0.5);
             break;
         case 38:
@@ -692,13 +743,30 @@ function moveTool(keyCode){
             tools[attachedObject].mesh.translateY(-0.5);
             break;
     }s
+=======
+            tools[attachedObject].mesh.translateX(-1);
+            break;
+        case 38:
+            tools[attachedObject].mesh.translateY(1);
+            break;
+        case 39:
+            tools[attachedObject].mesh.translateX(1);
+            break;
+        case 40:
+            tools[attachedObject].mesh.translateY(-1);
+            break;
+    }
+>>>>>>> 5f042c8 (scalpel)
 }
 
 function onKeyDown(event){
     switch(event.keyCode) {
         case 83: // s for scalpel
             attachedObject = 0;
+<<<<<<< HEAD
             selectLight.visible = true;
+=======
+>>>>>>> 5f042c8 (scalpel)
             break;
         case 37:
         case 38:
@@ -708,7 +776,10 @@ function onKeyDown(event){
             break;
         case 68: // d for detach
             attachedObject = null;
+<<<<<<< HEAD
             selectLight.visible = false;
+=======
+>>>>>>> 5f042c8 (scalpel)
             break;
     }
 }
