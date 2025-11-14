@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 
 const scene = new THREE.Scene();
 
@@ -26,6 +28,8 @@ scene.add(fillLight);
 const backLight = new THREE.DirectionalLight(0xffffff, 0.7);
 backLight.position.set(0, 5, -10);
 scene.add(backLight);
+
+
 
 ///// Transformation Matrices /////
 function translationMatrix(tx, ty, tz) {
@@ -63,26 +67,163 @@ function rotationMatrixZ(theta) {
         0, 0, 0, 1
     );
 }
+
+function scaleMatrix(sx, sy, sz) {
+	return new THREE.Matrix4().set(
+		sx, 0, 0, 0,
+		0, sy, 0, 0,
+		0, 0, sz, 0,
+		0, 0, 0, 1
+	);
+}
+
 //////////////////////////////////
 
 // Operating table
 const table_geometry = new THREE.BoxGeometry( 10, 1, 20 );
-const table_material = new THREE.MeshBasicMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+const table_material = new THREE.MeshPhongMaterial( { color: 0xADD8E6, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+
 const table = new THREE.Mesh( table_geometry, table_material );
 scene.add( table );
 
-const leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 10, 32 );
+const leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 7, 32 );
 const leg1 = new THREE.Mesh( leg_geometry, table_material );
 const leg2 = new THREE.Mesh( leg_geometry, table_material );
 const leg3 = new THREE.Mesh( leg_geometry, table_material );
 const leg4 = new THREE.Mesh( leg_geometry, table_material );
 
-leg1.position.set(4.5, -5, -9.5);
-leg2.position.set(-4.5, -5, -9.5);
-leg3.position.set(4.5, -5, 9.5);
-leg4.position.set(-4.5, -5, 9.5);
+leg1.position.set(4.5, -3, -9.5);
+leg2.position.set(-4.5, -3, -9.5);
+leg3.position.set(4.5, -3, 9.5);
+leg4.position.set(-4.5, -3, 9.5);
 scene.add( leg1, leg2, leg3, leg4 );
 
+//////////////////////////////////
+
+let light2 = new THREE.PointLight(0x1f1f1f, 1, 10, 1);
+scene.add(light2);
+
+const ambientLight = new THREE.AmbientLight(0x505050);  // Soft white light
+scene.add(ambientLight);
+
+//////////////////////////////////
+
+// Heart #1 inside of person
+
+// Load heart model
+const loader = new OBJLoader();
+let heart;
+
+loader.load(
+    'heart.obj',
+    (object) => {
+        // Create realistic heart material
+        const heartMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff3838,
+            specular: 0x111111,
+            shininess: 30,
+            side: THREE.DoubleSide
+        });
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = heartMaterial;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+        heart = object;
+        scene.add(heart);
+
+        console.log('Heart loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+
+
+        let heartm = translationMatrix(0.2, 1.2, -4.5);
+        let heartscale = scaleMatrix(0.7, 0.7, 0.7);
+        let heart_transform = new THREE.Matrix4();
+
+        // heart_transform.multiplyMatrices(heartscale, heart_transform);
+        heart_transform.multiplyMatrices(heartm, heart_transform);
+
+        object.applyMatrix4(heart_transform)
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+        console.error('Error loading heart model:', error);
+    }
+);
+
+
+
+//////////////////////////////////
+
+
+//////////////////////////////////
+
+// Human body model
+
+// Load human body model
+let humanbody;
+
+const mtlLoader = new MTLLoader();
+// Optional: Set the path to the directory containing the files
+// mtlLoader.setPath('.'); 
+// mtlLoader.load('humanbody.mtl', function (materials) {
+//     materials.preload();
+
+// loader.setMaterials(materials);
+
+loader.load('humanbody.obj',(object) => {
+        // Create realistic body material
+        const bodyMaterial = new THREE.MeshPhongMaterial({
+            color: 0xe6bc98,
+            specular: 0x111111,
+            shininess: 10,
+            side: THREE.DoubleSide
+        });
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = bodyMaterial;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+
+        humanbody = object;
+        scene.add(humanbody);
+
+        let humanscale = 1.3;
+
+        let bodyt = translationMatrix(0, 0, -2);
+        let bodys = scaleMatrix(humanscale, humanscale, humanscale);
+        let body_transform = new THREE.Matrix4();
+
+        body_transform.multiplyMatrices(bodys, body_transform);
+        body_transform.multiplyMatrices(bodyt, body_transform);
+
+        humanbody.applyMatrix4(body_transform)
+
+        console.log('Body loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+    }, (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    }, (error) => {
+        console.error('Error loading body model:', error);
+    }
+);
+// });
 //////////////////////////////////
 
 // Gouraud Shader
