@@ -379,6 +379,65 @@ loader.load('blanket2.obj',(object) => {
 );
 //////////////////////////////////
 
+// scalpel
+
+let tools = [];
+let selectLight = new THREE.PointLight(0xffffff, 1, 0, 2);
+
+loader.load(
+    'models/scalpel.obj',
+    (object) => {
+        // Create realistic heart material
+        const heartMaterial = new THREE.MeshPhongMaterial({
+            color: 0x999B9B,
+            specular: 0x111111,
+            shininess: 30,
+            side: THREE.DoubleSide
+        });
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = heartMaterial;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+        let scalpel = object;
+        scene.add(scalpel);
+
+        console.log('scalpel loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+
+        let scalpelm = translationMatrix(10, -1.5, -4.5);
+        let scalpel_scale = scaleMatrix(0.2, 0.2, 0.2);
+        let scalpel_transform = new THREE.Matrix4();
+
+        scalpel_transform.multiplyMatrices(scalpel_scale, scalpel_transform);
+        scalpel_transform.multiplyMatrices(scalpelm, scalpel_transform);
+
+        object.applyMatrix4(scalpel_transform)
+
+
+        let newObject = { mesh: scalpel};
+
+        tools.push(newObject);
+
+        scalpel.add(selectLight);
+        selectLight.visible = false;
+        
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+        console.error('Error loading heart model:', error);
+    }
+);
+
 
 // Gouraud Shader
 function createGouraudMaterial(materialProperties) {   
@@ -481,15 +540,58 @@ window.addEventListener('resize', onWindowResize, false);
 // Handle keyboard input
 document.addEventListener('keydown', onKeyDown, false);
 
+// Handle mouse click
+document.addEventListener('click', onMouseClick, false);
+
+function onMouseClick() {
+    // selectLight.visible = !selectLight.visible;
+}
+
+
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+let attachedObject = null;
+
+function moveTool(keyCode){
+    if ( attachedObject == null | attachedObject >= tools.length )
+        return;
+
+    selectLight.visible = !selectLight.visible;
+    switch (keyCode) {
+        case 37:
+            tools[attachedObject].mesh.translateX(-0.5);
+            break;
+        case 38:
+            tools[attachedObject].mesh.translateY(0.5);
+            break;
+        case 39:
+            tools[attachedObject].mesh.translateX(0.5);
+            break;
+        case 40:
+            tools[attachedObject].mesh.translateY(-0.5);
+            break;
+    }
+}
+
 function onKeyDown(event){
     switch(event.keyCode) {
-
+        case 83: // s for scalpel
+            attachedObject = 0;
+            selectLight.visible = !selectLight.visible;
+            break;
+        case 37:
+        case 38:
+        case 39:
+        case 40:
+            moveTool(event.keyCode);
+            break;
+        case 68: // d for detach
+            attachedObject = null;
+            break;
     }
 }
 
