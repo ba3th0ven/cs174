@@ -11,6 +11,7 @@ camera.lookAt(0, 0, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize( window.innerWidth, window.innerHeight );
+renderer.shadowMap.enabled = true;
 document.body.appendChild( renderer.domElement );
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -79,6 +80,75 @@ function scaleMatrix(sx, sy, sz) {
 
 //////////////////////////////////
 
+// walls
+let walllen = 40;
+let wallup = 10;
+
+const wallgeo = new THREE.BoxGeometry( walllen, 0.2, walllen );
+const wallmaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+
+const wall_back = new THREE.Mesh( wallgeo, wallmaterial );
+const wall_right = new THREE.Mesh( wallgeo, wallmaterial );
+const wall_left = new THREE.Mesh( wallgeo, wallmaterial );
+scene.add( wall_back, wall_right, wall_left);
+
+let scaley = scaleMatrix(1, 0.6, 1);
+
+let walltx = translationMatrix(0, wallup, -20);
+let wall_rotx = rotationMatrixX(Math.PI / 2.0);
+let walltransform = new THREE.Matrix4();
+
+// walltransform.multiplyMatrices(wallt, walltransform);
+walltransform.multiplyMatrices(wall_rotx, walltransform);
+walltransform.multiplyMatrices(walltx, walltransform);
+walltransform.multiplyMatrices(scaley, walltransform);
+
+wall_back.applyMatrix4(walltransform);
+
+
+// right and left walls
+let wall_tleft = translationMatrix(-20, wallup, 0);
+let wall_tright = translationMatrix(20, wallup, 0);
+let wall_rotz = rotationMatrixZ(Math.PI / 2.0);
+
+
+walltransform = new THREE.Matrix4();
+walltransform.multiplyMatrices(wall_rotz, walltransform);
+walltransform.multiplyMatrices(wall_tleft, walltransform);
+walltransform.multiplyMatrices(scaley, walltransform);
+
+wall_left.applyMatrix4(walltransform);
+
+walltransform = new THREE.Matrix4();
+walltransform.multiplyMatrices(wall_rotz, walltransform);
+walltransform.multiplyMatrices(wall_tright, walltransform);
+walltransform.multiplyMatrices(scaley, walltransform);
+wall_right.applyMatrix4(walltransform);
+
+//////////////////////////////////
+
+//////////////////////////////////
+
+// floor
+const floorgeo = new THREE.BoxGeometry( 40, 0.2, 40 );
+const floormaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+
+const floor = new THREE.Mesh( floorgeo, floormaterial );
+scene.add( floor );
+
+let floort = translationMatrix(0, -3, 0);
+let floortransform = new THREE.Matrix4();
+
+floortransform.multiplyMatrices(floort, floortransform);
+floortransform.multiplyMatrices(floort, floortransform);
+
+floor.applyMatrix4(floortransform);
+
+//////////////////////////////////
+
+
+//////////////////////////////////
+
 // Operating table
 const table_geometry = new THREE.BoxGeometry( 10, 1, 20 );
 const table_material = new THREE.MeshPhongMaterial( { color: 0xADD8E6, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
@@ -100,7 +170,43 @@ scene.add( leg1, leg2, leg3, leg4 );
 
 //////////////////////////////////
 
+
+//////////////////////////////////
+
+// Second smaller table
+const table2_geo = new THREE.BoxGeometry( 10, 2, 20 );
+const table2_material = new THREE.MeshPhongMaterial( { color: 0x4d6966, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+
+const table2 = new THREE.Mesh( table2_geo, table2_material );
+scene.add( table2 );
+
+const table2_leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 10, 32 );
+const table_leg1 = new THREE.Mesh( table2_leg_geometry, table2_material );
+const table_leg2 = new THREE.Mesh( table2_leg_geometry, table2_material );
+const table_leg3 = new THREE.Mesh( table2_leg_geometry, table2_material );
+const table_leg4 = new THREE.Mesh( table2_leg_geometry, table2_material );
+
+table_leg1.position.set(4.5, -5, -9.5);
+table_leg2.position.set(-4.5, -5, -9.5);
+table_leg3.position.set(4.5, -5, 9.5);
+table_leg4.position.set(-4.5, -5, 9.5);
+table2.add( table_leg1, table_leg2, table_leg3, table_leg4 );
+
+let tablescale = 0.7;
+
+let tablet = translationMatrix(10, -2, 0);
+let tables = scaleMatrix(tablescale, tablescale*0.7, tablescale);
+let table_transform = new THREE.Matrix4();
+
+table_transform.multiplyMatrices(tables, table_transform);
+table_transform.multiplyMatrices(tablet, table_transform);
+
+table2.applyMatrix4(table_transform);
+
+//////////////////////////////////
+
 let light2 = new THREE.PointLight(0x1f1f1f, 1, 10, 1);
+light2.castShadow = true
 scene.add(light2);
 
 const ambientLight = new THREE.AmbientLight(0x505050);  // Soft white light
@@ -119,7 +225,7 @@ loader.load(
     (object) => {
         // Create realistic heart material
         const heartMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff3838,
+            color: 0x8B0000,
             specular: 0x111111,
             shininess: 30,
             side: THREE.DoubleSide
@@ -185,7 +291,7 @@ loader.load('humanbody.obj',(object) => {
         const bodyMaterial = new THREE.MeshPhongMaterial({
             color: 0xe6bc98,
             specular: 0x111111,
-            shininess: 10,
+            shininess: 50,
             side: THREE.DoubleSide
         });
 
@@ -225,6 +331,54 @@ loader.load('humanbody.obj',(object) => {
 );
 // });
 //////////////////////////////////
+
+let blanket;
+
+loader.load('blanket2.obj',(object) => {
+        // Create realistic body material
+        const blanketMat = new THREE.MeshPhongMaterial({
+            color: 0x89CFFF,
+            specular: 0x111111,
+            shininess: 10,
+            side: THREE.DoubleSide
+        });
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = blanketMat;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+
+        blanket = object;
+        scene.add(blanket);
+
+        let blanketscale = 1.3;
+
+        let blankett = translationMatrix(0.0, 0.45, -2.0);
+        let blankets = scaleMatrix(blanketscale*0.95, blanketscale*0.95, blanketscale);
+        let blanket_transform = new THREE.Matrix4();
+
+        blanket_transform.multiplyMatrices(blankets, blanket_transform);
+        blanket_transform.multiplyMatrices(blankett, blanket_transform);
+
+        blanket.applyMatrix4(blanket_transform)
+
+        console.log('Body loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+    }, (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    }, (error) => {
+        console.error('Error loading body model:', error);
+    }
+);
+//////////////////////////////////
+
 
 // Gouraud Shader
 function createGouraudMaterial(materialProperties) {   
