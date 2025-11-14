@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
-import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 
 const scene = new THREE.Scene();
 
@@ -221,7 +221,7 @@ const loader = new OBJLoader();
 let heart;
 
 loader.load(
-    'heart.obj',
+    'models/heart.obj',
     (object) => {
         // Create realistic heart material
         const heartMaterial = new THREE.MeshPhongMaterial({
@@ -286,7 +286,7 @@ const mtlLoader = new MTLLoader();
 
 // loader.setMaterials(materials);
 
-loader.load('humanbody.obj',(object) => {
+loader.load('models/humanbody.obj',(object) => {
         // Create realistic body material
         const bodyMaterial = new THREE.MeshPhongMaterial({
             color: 0xe6bc98,
