@@ -2,8 +2,11 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { MeshLineGeometry, MeshLineMaterial } from 'meshline';
+
 
 const scene = new THREE.Scene();
+let clock = new THREE.Clock();
 
 const camera = new THREE.PerspectiveCamera( 35, window.innerWidth / window.innerHeight, 0.1, 1000 );
 camera.position.set(0, 10, 20);
@@ -171,6 +174,8 @@ scene.add( leg1, leg2, leg3, leg4 );
 //////////////////////////////////
 
 
+
+
 //////////////////////////////////
 
 // Second smaller table
@@ -266,26 +271,7 @@ loader.load(
     }
 );
 
-
-
-//////////////////////////////////
-
-
-//////////////////////////////////
-
-// Human body model
-
-// Load human body model
 let humanbody;
-
-const mtlLoader = new MTLLoader();
-// Optional: Set the path to the directory containing the files
-// mtlLoader.setPath('.'); 
-// mtlLoader.load('humanbody.mtl', function (materials) {
-//     materials.preload();
-
-// loader.setMaterials(materials);
-
 loader.load('models/humanbody.obj',(object) => {
         // Create realistic body material
         const bodyMaterial = new THREE.MeshPhongMaterial({
@@ -329,8 +315,141 @@ loader.load('models/humanbody.obj',(object) => {
         console.error('Error loading body model:', error);
     }
 );
-// });
+
 //////////////////////////////////
+
+
+loader.load('cardiogram.obj',(cardiogram) => {
+        // Create realistic body material
+        const cardiogram_mat = new THREE.MeshPhongMaterial({
+            color:0xFFFFF7,
+            specular: 0x111111,
+            shininess: 50,
+            side: THREE.DoubleSide
+        });
+
+        cardiogram.traverse((child) => {
+            if (child.isMesh) {
+                child.material = cardiogram_mat;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+        scene.add(cardiogram);
+
+        let cardscale = 1.7;
+
+        let cardt = translationMatrix(5.5, -5.5, -12);
+        let cards = scaleMatrix(cardscale, cardscale, cardscale);
+        let card_transform = new THREE.Matrix4();
+
+        card_transform.multiplyMatrices(cards, card_transform);
+        card_transform.multiplyMatrices(cardt, card_transform);
+
+        cardiogram.applyMatrix4(card_transform);
+
+        console.log('cardiogram loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+    }, (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    }, (error) => {
+        console.error('Error loading body model:', error);
+    }
+);
+
+
+/////////////////////////////////////////////
+const screen_geo = new THREE.BoxGeometry( 5, 0.2, 2.8 );
+const screen_mat = new THREE.MeshPhongMaterial( { color: 0x121212, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+
+const screen = new THREE.Mesh( screen_geo, screen_mat );
+scene.add( screen );
+
+
+let screent = translationMatrix(5.5, 8, -11.5);
+let screenrotx = rotationMatrixX(Math.PI / 2.0);
+let screen_transform = new THREE.Matrix4();
+
+screen_transform.multiplyMatrices(screenrotx, screen_transform);
+screen_transform.multiplyMatrices(screent, screen_transform);
+
+screen.applyMatrix4(screen_transform);
+
+/////////////////////////////////////////////
+
+const geometry = new MeshLineGeometry();
+// const geometryPoints = [
+//   new THREE.Vector3(-2, 3, 0),
+//   new THREE.Vector3(3, 3, -2),
+//   new THREE.Vector3(0, -2, 0),
+//   new THREE.Vector3(-2, 0, 2),
+//   new THREE.Vector3(-2, 6, 5),
+//   new THREE.Vector3(5, 2, -3),
+// ];
+
+
+
+
+// # very approximate sinusoidal representation
+function ecg(t, period) {
+    t = t * period;
+    const phase = 2.0 * Math.cos(t);
+    const r_wave = -Math.sin(t + phase);
+    const q_scalar = 0.50 - 0.75 * Math.sin(t - 1.0);
+    const s_scalar = 0.25 - 0.125 * Math.sin(1.25 * phase - 1.0);
+    return 3.14 * q_scalar * r_wave * s_scalar;   // amplitude
+}
+const geometryPoints = [];
+
+const ECG_SCALE = 8;   // amplitude scaling factor
+const period = 0.5;
+
+for (let t = 0; t <= Math.PI * 12; t += 0.01) {
+
+  const x = t; 
+  const y = ECG_SCALE * ecg(t, period);
+
+  geometryPoints.push(new THREE.Vector3(x, y, 0));
+}
+
+// const geometryPoints = [];
+// for (let t = 0; t <= Math.PI * 2; t += 0.01) {
+//   const x = 16 * Math.pow(Math.sin(t), 3);
+//   const y =
+//     12 * Math.cos(t) -
+//     5 * Math.cos(3 * t) -
+//     2 * Math.cos(3 * t) -
+//     Math.cos(4 * t);
+//   geometryPoints.push(new THREE.Vector3(x, y, 0));
+// }
+
+geometry.setPoints(geometryPoints);
+const lineMaterial = new MeshLineMaterial({
+  color: new THREE.Color(0x0fbf0f),
+  lineWidth: 0.25,
+  resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
+});
+const mymesh = new THREE.Mesh(geometry, lineMaterial);
+screen.add(mymesh);
+
+let scale = 0.1
+let waveform_scale = scaleMatrix(scale, scale, scale);
+let waveform_rot = rotationMatrixX(-Math.PI / 2.0)
+let waveform_tx = translationMatrix(-2, 0.15, 0);
+
+let waveform_transform = new THREE.Matrix4();
+
+waveform_transform.multiplyMatrices(waveform_scale, waveform_transform);
+waveform_transform.multiplyMatrices(waveform_rot, waveform_transform);
+waveform_transform.multiplyMatrices(waveform_tx, waveform_transform);
+
+mymesh.applyMatrix4(waveform_transform);
+
+/////////////////////////////////////////////
 
 let blanket;
 
@@ -559,8 +678,6 @@ let attachedObject = null;
 function moveTool(keyCode){
     if ( attachedObject == null | attachedObject >= tools.length )
         return;
-
-    selectLight.visible = !selectLight.visible;
     switch (keyCode) {
         case 37:
             tools[attachedObject].mesh.translateX(-0.5);
@@ -574,14 +691,14 @@ function moveTool(keyCode){
         case 40:
             tools[attachedObject].mesh.translateY(-0.5);
             break;
-    }
+    }s
 }
 
 function onKeyDown(event){
     switch(event.keyCode) {
         case 83: // s for scalpel
             attachedObject = 0;
-            selectLight.visible = !selectLight.visible;
+            selectLight.visible = true;
             break;
         case 37:
         case 38:
@@ -591,6 +708,7 @@ function onKeyDown(event){
             break;
         case 68: // d for detach
             attachedObject = null;
+            selectLight.visible = false;
             break;
     }
 }
@@ -669,5 +787,22 @@ function updateShaderMaterialUniforms(object, camera, scene) {
 function animate() {
     controls.update();
 	renderer.render( scene, camera );
+
+    let time = clock.getElapsedTime();
+
+    // TODO: Animate sun radius and color
+    let period10 = time % 1;
+
+    let heartbeat_scale = 1;
+    let suncolormod = 0;
+
+    if (period10 > 0.57) {
+        heartbeat_scale = -0.2 * period10 + 1.2;
+    } else if (period10 < 0.15) {} 
+    else {
+        heartbeat_scale = 0.15 * period10 + 1;
+    }
+
+    heart.scale.set(heartbeat_scale, heartbeat_scale*0.8, heartbeat_scale*0.8);
 }
 renderer.setAnimationLoop( animate );
