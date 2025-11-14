@@ -15,6 +15,18 @@ const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(0, 10, 20);
 controls.target.set(0, 0, 0);
 
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+keyLight.position.set(10, 5, 10);
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0xcccccc, 0.5);
+fillLight.position.set(-10, 5, 10);
+scene.add(fillLight);
+
+const backLight = new THREE.DirectionalLight(0xffffff, 0.7);
+backLight.position.set(0, 5, -10);
+scene.add(backLight);
+
 ///// Transformation Matrices /////
 function translationMatrix(tx, ty, tz) {
     return new THREE.Matrix4().set(
@@ -55,9 +67,23 @@ function rotationMatrixZ(theta) {
 
 // Operating table
 const table_geometry = new THREE.BoxGeometry( 10, 1, 20 );
-const table_material = new THREE.MeshBasicMaterial( { color: 0x777b7e } );
+const table_material = new THREE.MeshBasicMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 const table = new THREE.Mesh( table_geometry, table_material );
 scene.add( table );
+
+const leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 10, 32 );
+const leg1 = new THREE.Mesh( leg_geometry, table_material );
+const leg2 = new THREE.Mesh( leg_geometry, table_material );
+const leg3 = new THREE.Mesh( leg_geometry, table_material );
+const leg4 = new THREE.Mesh( leg_geometry, table_material );
+
+leg1.position.set(4.5, -5, -9.5);
+leg2.position.set(-4.5, -5, -9.5);
+leg3.position.set(4.5, -5, 9.5);
+leg4.position.set(-4.5, -5, 9.5);
+scene.add( leg1, leg2, leg3, leg4 );
+
+//////////////////////////////////
 
 // Gouraud Shader
 function createGouraudMaterial(materialProperties) {   
@@ -169,6 +195,77 @@ function onWindowResize() {
 function onKeyDown(event){
     switch(event.keyCode) {
 
+    }
+}
+
+function updateShaderMaterialUniforms(object, camera, scene) {
+    const material = object.material;
+    if (!material || !material.uniforms) return;
+
+    const uniforms = material.uniforms;
+
+    // User-defined number of lights (stored when material was created)
+    const numLights = material.userData.numLights ?? 1;
+
+    const lights = scene.children.filter(c => c.isLight).slice(0, numLights);
+
+    // Update transforms
+    object.updateMatrixWorld();
+    camera.updateMatrixWorld();
+
+    uniforms.model_transform.value.copy(object.matrixWorld);
+
+    uniforms.projection_camera_model_transform.value
+        .copy(camera.projectionMatrix)
+        .multiply(camera.matrixWorldInverse)
+        .multiply(object.matrixWorld);
+
+    // Camera center
+    uniforms.camera_center.value.setFromMatrixPosition(camera.matrixWorld);
+
+    // Squared scale
+    const s = object.scale;
+    uniforms.squared_scale.value.set(s.x * s.x, s.y * s.y, s.z * s.z);
+
+    // Clear and repopulate light uniforms
+    uniforms.light_positions_or_vectors.value = [];
+    uniforms.light_colors.value = [];
+    uniforms.light_attenuation_factors.value = [];
+
+    for (let i = 0; i < numLights; i++) {
+        const light = lights[i];
+
+        if (light) {
+            const lpv = new THREE.Vector4();
+
+            if (light.isDirectionalLight) {
+                const dir = new THREE.Vector3();
+                light.getWorldDirection(dir);
+                lpv.set(dir.x, dir.y, dir.z, 0.0);
+            } else {
+                lpv.set(light.position.x, light.position.y, light.position.z, 1.0);
+            }
+
+            uniforms.light_positions_or_vectors.value.push(lpv);
+
+            uniforms.light_colors.value.push(
+                new THREE.Vector4(light.color.r, light.color.g, light.color.b, 1.0)
+            );
+
+            let attenuation = 0.0;
+            if (light.isPointLight) {
+                attenuation = 1.0 / Math.max(1.0, light.distance * light.distance);
+            }
+
+            attenuation *= light.intensity ?? 1.0;
+            uniforms.light_attenuation_factors.value.push(attenuation);
+
+        } else {
+            // Default / missing light padding
+            uniforms.light_positions_or_vectors.value.push(new THREE.Vector4(0,0,0,0));
+            uniforms.light_colors.value.push(new THREE.Vector4(0,0,0,1));
+            uniforms.light_attenuation_factors.value.push(0.0);
+        }
     }
 }
 
