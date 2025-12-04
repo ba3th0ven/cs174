@@ -1,12 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-<<<<<<< HEAD
-import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshLineGeometry, MeshLineMaterial } from 'meshline';
 
-=======
->>>>>>> 5f042c8 (scalpel)
 
 const scene = new THREE.Scene();
 let clock = new THREE.Clock();
@@ -23,6 +21,22 @@ document.body.appendChild( renderer.domElement );
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(0, 10, 20);
 controls.target.set(0, 0, 0);
+
+const transformControls = new TransformControls(camera, renderer.domElement);
+scene.add(transformControls.getHelper());
+
+// prevent objects from being scaled
+/*
+transformControls.showX = false;
+transformControls.showY = false;
+transformControls.showZ = false;
+*/
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hovered = null;
+let selected = null;
+let resetting = false;
 
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
 keyLight.position.set(10, 5, 10);
@@ -75,7 +89,7 @@ function rotationMatrixZ(theta) {
     );
 }
 
-<<<<<<< HEAD
+
 function scaleMatrix(sx, sy, sz) {
 	return new THREE.Matrix4().set(
 		sx, 0, 0, 0,
@@ -143,46 +157,24 @@ const floormaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0
 const floor = new THREE.Mesh( floorgeo, floormaterial );
 scene.add( floor );
 
-let floort = translationMatrix(0, -3, 0);
+let floort = translationMatrix(0, -6, 0);
 let floortransform = new THREE.Matrix4();
 
-floortransform.multiplyMatrices(floort, floortransform);
 floortransform.multiplyMatrices(floort, floortransform);
 
 floor.applyMatrix4(floortransform);
 
 //////////////////////////////////
 
-=======
-function scalingMatrix( sx, sy, sz ) {
-    return new THREE.Matrix4().set(
-        sx, 0, 0, 0,
-        0, sy, 0, 0,
-        0, 0, sz, 0,
-        0, 0, 0, 1
-    );
-}
-
-let attachedObject = null;
-let tools = [];
->>>>>>> 5f042c8 (scalpel)
 
 //////////////////////////////////
 ///////////// Meshes /////////////
 
 // Operating table
-<<<<<<< HEAD
-const table_geometry = new THREE.BoxGeometry( 10, 1, 20 );
-const table_material = new THREE.MeshPhongMaterial( { color: 0xADD8E6, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
-
-const table = new THREE.Mesh( table_geometry, table_material );
-scene.add( table );
-=======
 const table = new THREE.Group()
 const tabletop_geometry = new THREE.BoxGeometry( 10, 1, 20 );
-const table_material = new THREE.MeshBasicMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+const table_material = new THREE.MeshPhongMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 const tabletop = new THREE.Mesh( tabletop_geometry, table_material );
->>>>>>> 5f042c8 (scalpel)
 
 const leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 7, 32 );
 const leg1 = new THREE.Mesh( leg_geometry, table_material );
@@ -190,33 +182,12 @@ const leg2 = new THREE.Mesh( leg_geometry, table_material );
 const leg3 = new THREE.Mesh( leg_geometry, table_material );
 const leg4 = new THREE.Mesh( leg_geometry, table_material );
 
-<<<<<<< HEAD
 leg1.position.set(4.5, -3, -9.5);
 leg2.position.set(-4.5, -3, -9.5);
 leg3.position.set(4.5, -3, 9.5);
 leg4.position.set(-4.5, -3, 9.5);
-scene.add( leg1, leg2, leg3, leg4 );
-=======
-leg1.position.set(4.5, -5, -9.5);
-leg2.position.set(-4.5, -5, -9.5);
-leg3.position.set(4.5, -5, 9.5);
-leg4.position.set(-4.5, -5, 9.5);
 table.add(tabletop, leg1, leg2, leg3, leg4);
 scene.add( table );
-
-// Load objects
-const loader = new OBJLoader();
-const scalpel = await loader.loadAsync( 'models/scalpel.obj' );
-scalpel.scale.setScalar(0.3);
-scalpel.position.set(7, 0, 0);
-scene.add( scalpel );
-
-
-tools = [
-    {mesh: scalpel}
-];
-
->>>>>>> 5f042c8 (scalpel)
 
 //////////////////////////////////
 
@@ -257,23 +228,72 @@ table2.applyMatrix4(table_transform);
 
 //////////////////////////////////
 
+/*
 let light2 = new THREE.PointLight(0x1f1f1f, 1, 10, 1);
 light2.castShadow = true
 scene.add(light2);
+*/
 
 const ambientLight = new THREE.AmbientLight(0x505050);  // Soft white light
 scene.add(ambientLight);
 
 //////////////////////////////////
+let loader = new OBJLoader();
+
+function loadModel(obj, path, material, trans, scale) {
+    return new Promise((resolve, reject) => {
+        loader.load(
+            path,
+            // onLoad
+            (object) => {
+                object.traverse((child) => {
+                    if (child.isMesh) {
+                        child.material = material;
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.geometry.computeVertexNormals();
+                    }
+                });
+
+                obj = object;
+
+                console.log(path, 'loaded successfully!');
+                if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
+                    console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+                }
+
+                // Apply transform
+                let transform = new THREE.Matrix4();
+                transform.multiplyMatrices(trans, transform);
+                transform.multiplyMatrices(scale, transform);
+                object.applyMatrix4(transform);
+
+                resolve(object);   // <-- IMPORTANT
+            },
+
+            // onProgress
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+
+            // onError
+            (error) => {
+                console.error('Error loading ', path, error);
+                reject(error);
+            }
+        );
+    });
+}
+
 
 // Heart #1 inside of person
 
 // Load heart model
-const loader = new OBJLoader();
 let heart;
+let heart2;
 
 loader.load(
-    'models/heart.obj',
+    'models/heart/base.obj',
     (object) => {
         // Create realistic heart material
         const heartMaterial = new THREE.MeshPhongMaterial({
@@ -302,10 +322,60 @@ loader.load(
 
 
         let heartm = translationMatrix(0.2, 1.2, -4.5);
+        let heart_rotx = rotationMatrixX(-Math.PI / 2.0);
         let heartscale = scaleMatrix(0.7, 0.7, 0.7);
         let heart_transform = new THREE.Matrix4();
 
         // heart_transform.multiplyMatrices(heartscale, heart_transform);
+        heart_transform.multiplyMatrices(heart_rotx, heart_transform);
+        heart_transform.multiplyMatrices(heartm, heart_transform);
+
+        object.applyMatrix4(heart_transform)
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+        console.error('Error loading heart model:', error);
+    }
+);
+
+loader.load(
+    'models/heart/base.obj',
+    (object) => {
+        // Create realistic heart material
+        const heartMaterial = new THREE.MeshPhongMaterial({
+            color: 0x8B0000,
+            specular: 0x111111,
+            shininess: 30,
+            side: THREE.DoubleSide
+        });
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = heartMaterial;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+        heart2 = object;
+        scene.add(heart2);
+
+        console.log('Heart loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+
+
+        let heartm = translationMatrix(9.5, -1, 2);
+        let heart_rotx = rotationMatrixX(-Math.PI / 2.0);
+        let heartscale = scaleMatrix(0.7, 0.7, 0.7);
+        let heart_transform = new THREE.Matrix4();
+
+        // heart_transform.multiplyMatrices(heartscale, heart_transform);
+        heart_transform.multiplyMatrices(heart_rotx, heart_transform);
         heart_transform.multiplyMatrices(heartm, heart_transform);
 
         object.applyMatrix4(heart_transform)
@@ -355,7 +425,10 @@ loader.load('models/humanbody.obj',(object) => {
         humanbody.applyMatrix4(body_transform)
 
         console.log('Body loaded successfully!');
-        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+
+        if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
+            console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+        }
     }, (xhr) => {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     }, (error) => {
@@ -365,9 +438,8 @@ loader.load('models/humanbody.obj',(object) => {
 
 //////////////////////////////////
 
-
-loader.load('cardiogram.obj',(cardiogram) => {
-        // Create realistic body material
+//cardiogram
+loader.load('models/cardiogram.obj',(object) => {
         const cardiogram_mat = new THREE.MeshPhongMaterial({
             color:0xFFFFF7,
             specular: 0x111111,
@@ -375,7 +447,7 @@ loader.load('cardiogram.obj',(cardiogram) => {
             side: THREE.DoubleSide
         });
 
-        cardiogram.traverse((child) => {
+        object.traverse((child) => {
             if (child.isMesh) {
                 child.material = cardiogram_mat;
                 child.castShadow = true;
@@ -386,7 +458,7 @@ loader.load('cardiogram.obj',(cardiogram) => {
             }
         });
 
-        scene.add(cardiogram);
+        scene.add(object);
 
         let cardscale = 1.7;
 
@@ -397,10 +469,10 @@ loader.load('cardiogram.obj',(cardiogram) => {
         card_transform.multiplyMatrices(cards, card_transform);
         card_transform.multiplyMatrices(cardt, card_transform);
 
-        cardiogram.applyMatrix4(card_transform);
+        object.applyMatrix4(card_transform);
 
         console.log('cardiogram loaded successfully!');
-        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+        //console.log('Vertices:', object.children[0].geometry.attributes.position.count);
     }, (xhr) => {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     }, (error) => {
@@ -500,7 +572,7 @@ mymesh.applyMatrix4(waveform_transform);
 
 let blanket;
 
-loader.load('blanket2.obj',(object) => {
+loader.load('models/blanket2.obj',(object) => {
         // Create realistic body material
         const blanketMat = new THREE.MeshPhongMaterial({
             color: 0x89CFFF,
@@ -536,7 +608,7 @@ loader.load('blanket2.obj',(object) => {
         blanket.applyMatrix4(blanket_transform)
 
         console.log('Body loaded successfully!');
-        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+        // console.log('Vertices:', object.children[0].geometry.attributes.position.count);
     }, (xhr) => {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     }, (error) => {
@@ -546,24 +618,67 @@ loader.load('blanket2.obj',(object) => {
 //////////////////////////////////
 
 // scalpel
-
-let tools = [];
+const tools = {};
+const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -10);  // horizontal plane
+const dragOffset = new THREE.Vector3();
 let selectLight = new THREE.PointLight(0xffffff, 1, 0, 2);
 
-loader.load(
-    'models/scalpel.obj',
-    (object) => {
-        // Create realistic heart material
-        const heartMaterial = new THREE.MeshPhongMaterial({
+/*
+let scalpel;
+let scalpel_trans = translationMatrix(10, -1.5, -4.5);
+let scalpel_scale = scaleMatrix(0.2, 0.2, 0.2);
+const scalpel_material = new THREE.MeshPhongMaterial({
             color: 0x999B9B,
             specular: 0x111111,
             shininess: 30,
             side: THREE.DoubleSide
         });
+loadModel(scalpel, 'models/scalpel.obj', scalpel_material, 
+    scalpel_trans, scalpel_scale)
+    .then( (obj) => {
+        scalpel = obj;
+        tools.push({ mesh: scalpel });
+        scalpel.add(selectLight);
+        selectLight.visible = false; 
+    });
 
-        object.traverse((child) => {
+const scalpel = await loader.loadAsync( 'models/scalpel.obj' );
+scalpel.scale.setScalar(0.3);
+scalpel.position.set(8, 0, 0);
+scene.add( scalpel );
+scalpel.add(selectLight);
+selectLight.visible = false; 
+*/
+
+//surgical tools
+
+const gltf_loader = new GLTFLoader();
+
+const ToolNames = {
+    // commenting out bc we don't need to select them
+    //scissors_T1: "Scissors_T1",
+    //scissors_T2: "Scissors_T2",
+    //scissors_T3: "Scissors_T3",
+
+    tweezers: "w",
+    needle: "Needle",
+    scalpel: "SM_Scalpel_low_2",
+    
+    // syringe: "Syringe",
+    // syringe_cap: "Syringe_cap",
+};
+
+const TABLE_Y = -1.65; // tool height
+
+gltf_loader.load(
+    //'models/vr-surgical-tool-set/source/Surgeon_assets.fbx'
+    //'models/vr_surgical_tool_set/scene.gltf',
+    'models/tools.glb',
+    (gltf) => {
+        /*
+        set.traverse((child) => {
             if (child.isMesh) {
-                child.material = heartMaterial;
+                child.material = table_material;
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -571,43 +686,72 @@ loader.load(
                 child.geometry.computeVertexNormals();
             }
         });
+        */
 
-        let scalpel = object;
-        scene.add(scalpel);
+        scene.add(gltf.scene);
 
-        console.log('scalpel loaded successfully!');
-        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+        gltf.scene.scale.setScalar(10);
+        gltf.scene.position.set(9.5, -1.65, -4);
+        //gltf.scene.position.set(toolsX, toolsY, toolsZ);
 
-        let scalpelm = translationMatrix(10, -1.5, -4.5);
-        let scalpel_scale = scaleMatrix(0.2, 0.2, 0.2);
-        let scalpel_transform = new THREE.Matrix4();
+        for (const [key, name] of Object.entries(ToolNames)) {
+            let tool = gltf.scene.getObjectByName(name);
 
-        scalpel_transform.multiplyMatrices(scalpel_scale, scalpel_transform);
-        scalpel_transform.multiplyMatrices(scalpelm, scalpel_transform);
+            // bounding box for object
+            let bbox = new THREE.Box3().setFromObject(tool);
+            let center = bbox.getCenter(new THREE.Vector3());
 
-        object.applyMatrix4(scalpel_transform)
+            // wrapper so we can translate dynamically
+            let wrapper = new THREE.Object3D();
+            wrapper.position.copy(center);
 
+            // Put wrapper in the scene instead of the original parent node
+            tool.parent.add(wrapper);
+            wrapper.add(tool);
 
-        let newObject = { mesh: scalpel};
+            tools[key] = { mesh: tool,
+                wrapper: wrapper, 
+                pos: wrapper.position.clone(),
+                rot: wrapper.quaternion.clone() };
+            console.log(key, tools[key]);
+            console.log(tool)
+        }
 
-        tools.push(newObject);
-
-        scalpel.add(selectLight);
-        selectLight.visible = false;
-        
+        console.log(gltf.scene.children)
+        console.log('surgical tools loaded successfully!')
     },
     (xhr) => {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     },
     (error) => {
-        console.error('Error loading heart model:', error);
+        console.error('Error loading surgical tools:', error);
+    }
+);
+
+gltf_loader.load(
+    //'models/vr-surgical-tool-set/source/Surgeon_assets.fbx'
+    'models/tray.glb',
+    (gltf) => {
+        scene.add(gltf.scene)
+
+        gltf.scene.scale.setScalar(10);
+        gltf.scene.position.set(9.5, -1.65, 2);
+
+        console.log(gltf.scene.children)
+        console.log('surgical tray loaded successfully!')
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+        console.error('Error loading surgical tray:', error);
     }
 );
 
 
 // Gouraud Shader
 function createGouraudMaterial(materialProperties) {   
-    const numLights = 1;
+    const numLights = 3;
     let shape_color_representation = new THREE.Color(materialProperties.color);
 
     let shape_color = new THREE.Vector4(
@@ -700,88 +844,313 @@ function createGouraudMaterial(materialProperties) {
     });
 }
 
+// Custom Phong Shader has already been implemented, no need to make change.
+function createPhongMaterial(materialProperties) {
+    const numLights = 3;
+    
+    // convert shape_color1 to a Vector4
+    let shape_color_representation = new THREE.Color(materialProperties.color);
+    let shape_color = new THREE.Vector4(
+        shape_color_representation.r,
+        shape_color_representation.g,
+        shape_color_representation.b,
+        1.0
+    );
+
+    // Vertex Shader
+    let vertexShader = `
+        precision mediump float;
+        const int N_LIGHTS = ${numLights};
+        uniform float ambient, diffusivity, specularity, smoothness;
+        uniform vec4 light_positions_or_vectors[N_LIGHTS];
+        uniform vec4 light_colors[N_LIGHTS];
+        uniform float light_attenuation_factors[N_LIGHTS];
+        uniform vec4 shape_color;
+        uniform vec3 squared_scale;
+        uniform vec3 camera_center;
+        varying vec3 N, vertex_worldspace;
+
+        // ***** PHONG SHADING HAPPENS HERE: *****
+        vec3 phong_model_lights(vec3 N, vec3 vertex_worldspace) {
+            vec3 E = normalize(camera_center - vertex_worldspace); // View direction
+            vec3 result = vec3(0.0); // Initialize the output color
+            for(int i = 0; i < N_LIGHTS; i++) {
+                // Calculate the vector from the surface to the light source
+                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
+                    light_positions_or_vectors[i].w * vertex_worldspace;
+                float distance_to_light = length(surface_to_light_vector); // Light distance
+                vec3 L = normalize(surface_to_light_vector); // Light direction
+                
+                // Phong uses the reflection vector R
+                vec3 R = reflect(-L, N); // Reflect L around the normal N
+                
+                float diffuse = max(dot(N, L), 0.0); // Diffuse term
+                float specular = pow(max(dot(R, E), 0.0), smoothness); // Specular term
+                
+                // Light attenuation
+                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light);
+                
+                // Calculate the contribution of this light source
+                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
+                                        + light_colors[i].xyz * specularity * specular;
+                result += attenuation * light_contribution;
+            }
+            return result;
+        }
+
+        uniform mat4 model_transform;
+        uniform mat4 projection_camera_model_transform;
+
+        void main() {
+            gl_Position = projection_camera_model_transform * vec4(position, 1.0);
+            N = normalize(mat3(model_transform) * normal / squared_scale);
+            vertex_worldspace = (model_transform * vec4(position, 1.0)).xyz;
+        }
+    `;
+    // Fragment Shader
+    let fragmentShader = `
+        precision mediump float;
+        const int N_LIGHTS = ${numLights};
+        uniform float ambient, diffusivity, specularity, smoothness;
+        uniform vec4 light_positions_or_vectors[N_LIGHTS];
+        uniform vec4 light_colors[N_LIGHTS];
+        uniform float light_attenuation_factors[N_LIGHTS];
+        uniform vec4 shape_color;
+        uniform vec3 camera_center;
+        varying vec3 N, vertex_worldspace;
+
+        // ***** PHONG SHADING HAPPENS HERE: *****
+        vec3 phong_model_lights(vec3 N, vec3 vertex_worldspace) {
+            vec3 E = normalize(camera_center - vertex_worldspace); // View direction
+            vec3 result = vec3(0.0); // Initialize the output color
+            for(int i = 0; i < N_LIGHTS; i++) {
+                // Calculate the vector from the surface to the light source
+                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
+                    light_positions_or_vectors[i].w * vertex_worldspace;
+                float distance_to_light = length(surface_to_light_vector); // Light distance
+                vec3 L = normalize(surface_to_light_vector); // Light direction
+                
+                // Phong uses the reflection vector R
+                vec3 R = reflect(-L, N); // Reflect L around the normal N
+                
+                float diffuse = max(dot(N, L), 0.0); // Diffuse term
+                float specular = pow(max(dot(R, E), 0.0), smoothness); // Specular term
+                
+                // Light attenuation
+                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light);
+                
+                // Calculate the contribution of this light source
+                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
+                                        + light_colors[i].xyz * specularity * specular;
+                result += attenuation * light_contribution;
+            }
+            return result;
+        }
+
+        void main() {
+            // Compute an initial (ambient) color:
+            vec4 color = vec4(shape_color.xyz * ambient, shape_color.w);
+            // Compute the final color with contributions from lights:
+            color.xyz += phong_model_lights(normalize(N), vertex_worldspace);
+            gl_FragColor = color;
+        }
+    `;
+    // Prepare uniforms
+    const uniforms = {
+        ambient: { value: materialProperties.ambient },
+        diffusivity: { value: materialProperties.diffusivity },
+        specularity: { value: materialProperties.specularity },
+        smoothness: { value: materialProperties.smoothness },
+        shape_color: { value: shape_color },
+        squared_scale: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+        camera_center: { value: new THREE.Vector3() },
+        model_transform: { value: new THREE.Matrix4() },
+        projection_camera_model_transform: { value: new THREE.Matrix4() },
+        light_positions_or_vectors: { value: [] },
+        light_colors: { value: [] },
+        light_attenuation_factors: { value: [] }
+    };
+
+    // Create the ShaderMaterial using the custom vertex and fragment shaders
+    return new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        uniforms: uniforms
+    });
+}
+
 // Handle window resize
 window.addEventListener('resize', onWindowResize, false);
 
 // Handle keyboard input
 document.addEventListener('keydown', onKeyDown, false);
 
+window.addEventListener('pointermove', onPointerMove, false);
+
+window.addEventListener('pointerdown', onPointerDown, false); 
+
+window.addEventListener('pointerup', onPointerUp, false);
+
+
+/*
 // Handle mouse click
 document.addEventListener('click', onMouseClick, false);
 
 function onMouseClick() {
     // selectLight.visible = !selectLight.visible;
 }
+*/
 
 
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+
+    lineMaterial.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
 }
 
-<<<<<<< HEAD
 let attachedObject = null;
 
-=======
->>>>>>> 5f042c8 (scalpel)
 function moveTool(keyCode){
-    if ( attachedObject == null | attachedObject >= tools.length )
+    if ( attachedObject == null || attachedObject >= tools.length )
         return;
     switch (keyCode) {
         case 37:
-<<<<<<< HEAD
-            tools[attachedObject].mesh.translateX(-0.5);
+            tools[attachedObject].wrapper.position.translateX(-0.5);
             break;
         case 38:
-            tools[attachedObject].mesh.translateY(0.5);
+            tools[attachedObject].wrapper.position.translateY(0.5);
             break;
         case 39:
-            tools[attachedObject].mesh.translateX(0.5);
+            tools[attachedObject].wrapper.position.translateX(0.5);
             break;
         case 40:
-            tools[attachedObject].mesh.translateY(-0.5);
-            break;
-    }s
-=======
-            tools[attachedObject].mesh.translateX(-1);
-            break;
-        case 38:
-            tools[attachedObject].mesh.translateY(1);
-            break;
-        case 39:
-            tools[attachedObject].mesh.translateX(1);
-            break;
-        case 40:
-            tools[attachedObject].mesh.translateY(-1);
+            tools[attachedObject].wrapper.position.translateY(-0.5);
             break;
     }
->>>>>>> 5f042c8 (scalpel)
 }
 
 function onKeyDown(event){
     switch(event.keyCode) {
         case 83: // s for scalpel
-            attachedObject = 0;
-<<<<<<< HEAD
-            selectLight.visible = true;
-=======
->>>>>>> 5f042c8 (scalpel)
+            //transformControls.attach(tools['scalpel'].mesh);
+            //selectLight.visible = true;
             break;
         case 37:
         case 38:
         case 39:
-        case 40:
-            moveTool(event.keyCode);
+        case 40: // directional key pressed
+            // moveTool(event.keyCode);
             break;
         case 68: // d for detach
+            console.log('detach');
+            transformControls.detach();
+            controls.enabled = true;
+            selected = null;
             attachedObject = null;
-<<<<<<< HEAD
             selectLight.visible = false;
-=======
->>>>>>> 5f042c8 (scalpel)
             break;
+        case 82: // r for rotate
+            if (selected) {
+                console.log('rotate')
+                transformControls.mode = 'rotate';
+            }
+            break;
+        case 84: // t for translate
+            if (selected) {
+                console.log('translate');
+                transformControls.mode = 'translate';
+            }
+            break;
+        case 88: // x for reset
+            // for (tool in tools)
+            resetting = true;
+            transformControls.detach();
+            selected = null;
+            controls.enabled = true;
+            break;
+        }
+}
+
+function onPointerMove(event) {
+    mouse.x =  (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    // drag mode
+    /*
+    if (dragging && selected) {
+        controls.enabled = false;
+
+        const pt = new THREE.Vector3();
+        if (raycaster.ray.intersectPlane(dragPlane, pt)) {
+            console.log(pt)
+            selected.position.copy(pt);
+        }
+
+        controls.enabled = true;
+        return; // skip hover logic during dragging
     }
+    */
+
+    // hover mode
+    const hits = raycaster.intersectObjects(
+        Object.values(tools).map(t => t.mesh),
+        true
+    );
+
+    if (hits.length > 0) {
+        const tool = hits[0].object;
+
+        if (hovered !== tool) {
+            if (hovered) hovered.material.emissive.setHex(0x000000);
+
+            hovered = tool;
+            hovered.material.emissive.setHex(0x444444);
+        }
+    } else {
+        if (hovered) hovered.material.emissive.setHex(0x000000);
+        hovered = null;
+    }
+}
+
+function onPointerDown() {
+    console.log("click");
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(
+        Object.values(tools).map(t => t.mesh),
+        true
+    );
+
+    if (selected) { // Object selected, click -> detach
+        //transformControls.detach();
+        //dragging = false;
+        //selected = null;
+    }
+    else if (hits.length > 0) { // No object selected & hovering -> select
+        selected = hits[0].object;
+
+        // Initialize drag offset
+        raycaster.ray.intersectPlane(dragPlane, dragOffset);
+        transformControls.attach(selected);
+        controls.enabled = false;
+        console.log("Selected:", selected.name);
+    } else { // No object selected, not hovering -> do nothing
+        //selected = null;
+    }
+}
+
+function onPointerUp() {
+    if (selected) {
+        // Snap back to table height
+        //selected.position.y = TABLE_Y;   // <-- define earlier
+    }
+
+    //transformControls.detach();
+    //dragging = false;
+    //selected = null;
 }
 
 function updateShaderMaterialUniforms(object, camera, scene) {
@@ -861,8 +1230,40 @@ function animate() {
 
     let time = clock.getElapsedTime();
 
-    // TODO: Animate sun radius and color
     let period10 = time % 1;
+
+    if (resetting) {
+        let stillAnimating = false;
+
+        Object.values(tools).forEach(tool => {
+            const wrapper = tool.wrapper;
+
+            // update position
+            console.log(wrapper.position)
+            wrapper.position.lerp(tool.pos, 0.1);
+
+            console.log(wrapper.position.distanceTo(tool.pos))
+            // Check distance to see if it’s close enough
+            if (wrapper.position.distanceTo(tool.pos) > 0.001) {
+                stillAnimating = true;
+            }
+
+            // update rotation
+            wrapper.quaternion.rotateTowards(tool.rot);
+
+            // Check for rotation completion
+            if (Math.abs(wrapper.rotation.x - tool.rotx) > 0.001 ||
+                Math.abs(wrapper.rotation.y - tool.roty) > 0.001 ||
+                Math.abs(wrapper.rotation.z - tool.rotz) > 0.001) {
+                stillAnimating = true;
+            }
+        });
+
+        // If all tools are close enough to the start state, stop resetting
+        if (!stillAnimating) {
+            resetting = false;
+        }
+    }
 
     let heartbeat_scale = 1;
     let suncolormod = 0;
@@ -874,6 +1275,8 @@ function animate() {
         heartbeat_scale = 0.15 * period10 + 1;
     }
 
-    heart.scale.set(heartbeat_scale, heartbeat_scale*0.8, heartbeat_scale*0.8);
+    if (heart) {
+        heart.scale.set(heartbeat_scale, heartbeat_scale*0.8, heartbeat_scale*0.8);
+    }
 }
 renderer.setAnimationLoop( animate );
