@@ -37,8 +37,8 @@ transformControls.showZ = false;
 
 // Create a canvas element
 const canvas = document.createElement('canvas');
-canvas.width = 256; // Set appropriate dimensions
-canvas.height = 128;
+canvas.width = 2048; // Set appropriate dimensions
+canvas.height = 256;
 const ctx = canvas.getContext('2d');
 
 // Configure and draw text on the canvas
@@ -57,7 +57,7 @@ const material = new THREE.SpriteMaterial({ map: texture });
 const sprite = new THREE.Sprite(material);
 
 // Position and add the sprite to the scene
-sprite.position.set(0, 0, 0); // Adjust position as needed
+sprite.position.set(0, 10, 0); // Adjust position as needed
 scene.add(sprite);
 
 /////////////// Lights/Rays ///////////////
@@ -66,6 +66,9 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hovered = null;
 let selected = null;
+let hit = null;
+let dragging = false;
+let stage = "start"; // start, remove, replace, done
 let resetting = false;
 
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -310,6 +313,14 @@ function createPhongMaterial(materialProperties) {
         fragmentShader: fragmentShader,
         uniforms: uniforms
     });
+}
+
+function isDescendant(child, parent) {
+    while (child) {
+        if (child === parent) return true;
+        child = child.parent;
+    }
+    return false;
 }
 
 //////////////////////////////////
@@ -651,7 +662,7 @@ const heart_material = new THREE.MeshStandardMaterial({
       bumpMap: heart_pbr,
 });
 
-const heart_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+let heart_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 let heart_helper;
 
 loader.load(
@@ -733,10 +744,6 @@ loader.load(
 
         heart2 = object;
         scene.add(heart2);
-
-        heart2_bbox.setFromObject(heart2);
-        heart2_helper = new THREE.Box3Helper( heart2_bbox, 0xffff00 );
-        heart2.add(heart2_helper)
 
         console.log('Heart loaded successfully!');
         console.log('Vertices:', object.children[0].geometry.attributes.position.count);
@@ -1239,13 +1246,10 @@ gltf_loader.load(
 
         for (const [key, name] of Object.entries(ToolNames)) {
             let tool = gltf.scene.getObjectByName(name);
+            console.log(tool)
 
-            // bounding box for object
             let bbox = new THREE.Box3().setFromObject(tool);
             let center = bbox.getCenter(new THREE.Vector3());
-
-            // helper = new THREE.Box3Helper( bbox, 0xffff00 );
-            // tool.add(helper)
 
             // wrapper so we can translate dynamically
             let wrapper = new THREE.Object3D();
@@ -1256,10 +1260,10 @@ gltf_loader.load(
             wrapper.add(tool);
 
             tools[key] = { mesh: tool,
-                wrapper: wrapper, 
-                // helper: helper,
+                wrapper: wrapper,
                 pos: wrapper.position.clone(),
-                rot: wrapper.quaternion.clone() };
+                rot: wrapper.quaternion.clone(),
+                name: key };
             console.log(key, tools[key]);
             console.log(tool)
         }
@@ -1306,6 +1310,8 @@ window.addEventListener('pointermove', onPointerMove, false);
 window.addEventListener('pointerdown', onPointerDown, false); 
 
 window.addEventListener('pointerup', onPointerUp, false);
+
+transformControls.addEventListener('objectChange', onObjectChange, false); 
 
 
 /*
@@ -1364,6 +1370,7 @@ function onKeyDown(event){
             transformControls.detach();
             controls.enabled = true;
             selected = null;
+            dragging = false;
             attachedObject = null;
             selectLight.visible = false;
             break;
@@ -1380,11 +1387,12 @@ function onKeyDown(event){
             }
             break;
         case 88: // x for reset
-            // TODO: this part doesn't work
+            // TODO: this part doesn't work as intended
             // for (tool in tools)
             resetting = true;
             transformControls.detach();
             selected = null;
+            dragging = false;
             controls.enabled = true;
             break;
         }
@@ -1399,16 +1407,20 @@ function onPointerMove(event) {
     // drag mode
     /*
     if (dragging && selected) {
-        controls.enabled = false;
-
-        const pt = new THREE.Vector3();
-        if (raycaster.ray.intersectPlane(dragPlane, pt)) {
-            console.log(pt)
-            selected.position.copy(pt);
+        console.log(selected, selected.bbox)
+        if (stage == 'start' && selected.bbox.intersectsBox(heart_bbox)) 
+        {
+            if (selected.name == 'scalpel') //good 
+            {
+                stage = 'remove'
+                console.log('stab')
+            }
+            else //bad 
+            {
+                console.log('wrong tool')
+            }
         }
-
-        controls.enabled = true;
-        return; // skip hover logic during dragging
+        //return
     }
     */
 
@@ -1422,13 +1434,13 @@ function onPointerMove(event) {
         const tool = hits[0].object;
 
         if (hovered !== tool) {
-            if (hovered) hovered.material.emissive.setHex(0x000000);
+            // if (hovered) hovered.material.emissive.hex = 0x000000;
 
             hovered = tool;
-            hovered.material.emissive.setHex(0x444444);
+            // hovered.material.emissive.hex = 0x444444;
         }
     } else {
-        if (hovered) hovered.material.emissive.setHex(0x000000);
+        // if (hovered) hovered.material.emissive.hex = 0x000000;
         hovered = null;
     }
 }
@@ -1443,15 +1455,18 @@ function onPointerDown() {
 
     if (selected) { // Object selected, click -> detach
         //transformControls.detach();
-        //dragging = false;
+        dragging = true;
         //selected = null;
     }
     else if (hits.length > 0) { // No object selected & hovering -> select
-        selected = hits[0].object;
+        hit = hits[0].object;
+        selected = Object.values(tools).find(tool =>
+            hit === tool.mesh || isDescendant(hit, tool.mesh))
+        console.log(selected)
 
         // Initialize drag offset
         raycaster.ray.intersectPlane(dragPlane, dragOffset);
-        transformControls.attach(selected);
+        transformControls.attach(hit);
         controls.enabled = false;
         console.log("Selected:", selected.name);
     } else { // No object selected, not hovering -> do nothing
@@ -1466,8 +1481,36 @@ function onPointerUp() {
     }
 
     //transformControls.detach();
-    //dragging = false;
+    dragging = false;
     //selected = null;
+}
+
+function onObjectChange(event) {
+    // 'event.target' is the TransformControls instance
+    // 'event.target.object' is the currently attached object
+    let object = event.target.object;
+
+    //compute bounding box
+    let bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+    bbox.setFromObject(object);
+
+    heart_bbox = new THREE.Box3().setFromObject(heart);
+    
+    console.log(bbox, heart_bbox)
+    // You can add collision detection or other logic here
+    if (bbox.intersectsBox(heart_bbox)) {
+        console.log('intersection')
+        if (selected.name == 'scalpel') //good 
+        {
+            stage = 'remove'
+            console.log('stab')
+        }
+        else //bad 
+        {
+            console.log('wrong tool')
+        }
+    }
+        //return
 }
 
 function updateShaderMaterialUniforms(object, camera, scene) {
@@ -1557,7 +1600,7 @@ function animate() {
     monitor_uniforms.beatPeriod.value = isFlatlined ? 1.0e10 : T;
 
     Object.values(tools).forEach(tool => {
-        console.log(tool, tool.helper)
+        //console.log(tool, tool.helper)
     })
 
     if (resetting) {
@@ -1607,6 +1650,12 @@ function animate() {
 
     if (heart) {
         heart.scale.set(heartbeat_scale, heartbeat_scale*0.8, heartbeat_scale*0.8);
+    }
+
+    // stage based logic
+
+    if (stage == 'remove' && tools['scalpel'].mesh.material.opacity > 0) {
+        tools['scalpel'].mesh.material.opacity -= .05
     }
 }
 renderer.setAnimationLoop( animate );
