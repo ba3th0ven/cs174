@@ -23,7 +23,7 @@ camera.position.set(0, 10, 20);
 controls.target.set(0, 0, 0);
 
 const transformControls = new TransformControls(camera, renderer.domElement);
-scene.add(transformControls);
+scene.add(transformControls.getHelper());
 
 // prevent objects from being scaled
 /*
@@ -68,7 +68,7 @@ let hovered = null;
 let selected = null;
 let hit = null;
 let dragging = false;
-let stage = "start"; // start, remove, replace, done
+let stage = 'start'; // start, remove, replace, done
 let resetting = false;
 
 const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -690,10 +690,6 @@ loader.load(
         heart = object;
         scene.add(heart);
 
-        heart_bbox.setFromObject(heart);
-        heart_helper = new THREE.Box3Helper( heart_bbox, 0xffff00 );
-        heart.add(heart_helper)
-
         console.log('Heart loaded successfully!');
         console.log('Vertices:', object.children[0].geometry.attributes.position.count);
 
@@ -708,6 +704,8 @@ loader.load(
         heart_transform.multiplyMatrices(heartm, heart_transform);
 
         object.applyMatrix4(heart_transform)
+
+        console.log('heart position: ', heart.position)
     },
     (xhr) => {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
@@ -716,6 +714,10 @@ loader.load(
         console.error('Error loading heart model:', error);
     }
 );
+
+const tools = {};
+const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -10);  // horizontal plane
+const dragOffset = new THREE.Vector3();
 
 const heart2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 let heart2_helper;
@@ -762,9 +764,9 @@ loader.load(
 
         tools['heart'] = { mesh: heart2.children[0],
                 wrapper: heart2, 
-                helper: heart2_helper,
-                pos: heart2.position.clone(),
-                rot: heart2.quaternion.clone() };
+                pos: heart2.children[0].position.clone(),
+                rot: heart2.children[0].quaternion.clone(),
+                name: 'heart'};
             console.log(heart2, tools['heart']);
             console.log(tools['heart'].pos, tools['heart'].rot)
     },
@@ -796,17 +798,13 @@ const rib_material = new THREE.MeshStandardMaterial({
       DoubleSide: true
 });
 
+let rib_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+let rib_helper;
+
+
 loader.load(
     'public/models/12700_RibCage_v2.obj',
     (object) => {
-        // Create realistic heart material
-        const heartMaterial = new THREE.MeshPhongMaterial({
-            color: 0x8B0000,
-            specular: 0x111111,
-            shininess: 30,
-            side: THREE.DoubleSide
-        });
-
         object.traverse((child) => {
             if (child.isMesh) {
                 child.material = rib_material;
@@ -1168,9 +1166,6 @@ loader.load('models/blanket_final.obj',(object) => {
 //////////////////////////////////
 
 // scalpel
-const tools = {};
-const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -10);  // horizontal plane
-const dragOffset = new THREE.Vector3();
 let selectLight = new THREE.PointLight(0xffffff, 1, 0, 2);
 
 /*
@@ -1261,7 +1256,7 @@ gltf_loader.load(
 
             tools[key] = { mesh: tool,
                 wrapper: wrapper,
-                pos: wrapper.position.clone(),
+                pos: tool.position.clone(),
                 rot: wrapper.quaternion.clone(),
                 name: key };
             console.log(key, tools[key]);
@@ -1332,25 +1327,20 @@ function onWindowResize() {
     lineMaterial.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
 }
 
-let attachedObject = null;
+function detach() {
+    transformControls.detach();
+    controls.enabled = true;
+    selected = null;
+    dragging = false;
+}
 
-function moveTool(keyCode){
-    if ( attachedObject == null || attachedObject >= tools.length )
-        return;
-    switch (keyCode) {
-        case 37:
-            tools[attachedObject].wrapper.position.translateX(-0.5);
-            break;
-        case 38:
-            tools[attachedObject].wrapper.position.translateY(0.5);
-            break;
-        case 39:
-            tools[attachedObject].wrapper.position.translateX(0.5);
-            break;
-        case 40:
-            tools[attachedObject].wrapper.position.translateY(-0.5);
-            break;
-    }
+function resetPositions() {
+    Object.values(tools).forEach(tool => {
+        console.log(tool.mesh.position)
+        console.log(tool.pos)
+        //tool.mesh.position.copy(tool.pos)
+        //tool.mesh.quaternion.copy(tool.rot)
+    });
 }
 
 function onKeyDown(event){
@@ -1367,12 +1357,7 @@ function onKeyDown(event){
             break;
         case 68: // d for detach
             console.log('detach');
-            transformControls.detach();
-            controls.enabled = true;
-            selected = null;
-            dragging = false;
-            attachedObject = null;
-            selectLight.visible = false;
+            detach();
             break;
         case 82: // r for rotate
             if (selected) {
@@ -1389,11 +1374,9 @@ function onKeyDown(event){
         case 88: // x for reset
             // TODO: this part doesn't work as intended
             // for (tool in tools)
-            resetting = true;
-            transformControls.detach();
-            selected = null;
-            dragging = false;
-            controls.enabled = true;
+            //resetting = true;
+            detach();
+            resetPositions();
             break;
         }
 }
@@ -1485,30 +1468,100 @@ function onPointerUp() {
     //selected = null;
 }
 
+function deleteObject(object) {
+    if(object.parent) object.parent.remove(object)
+
+    object.geometry.dispose();
+    if(object.material && object.material.map) object.material.map.dispose(); // If there's a texture map
+    object.material.dispose();
+    if(object.helper) object.helper.dispose();
+
+    scene.remove(object)
+}
+
 function onObjectChange(event) {
     // 'event.target' is the TransformControls instance
     // 'event.target.object' is the currently attached object
     let object = event.target.object;
 
-    //compute bounding box
+    //compute bounding box for object being moved
     let bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
     bbox.setFromObject(object);
 
-    heart_bbox = new THREE.Box3().setFromObject(heart);
-    
-    console.log(bbox, heart_bbox)
-    // You can add collision detection or other logic here
-    if (bbox.intersectsBox(heart_bbox)) {
-        console.log('intersection')
-        if (selected.name == 'scalpel') //good 
-        {
-            stage = 'remove'
-            console.log('stab')
+    // collision detection
+    if (stage == 'start') { // we need to remove ribcage with scalpel
+        //rib_bbox = new THREE.Box3().setFromObject(ribcage);
+        rib_bbox.min.set(-3.0, 1.0282559585571287, -5.912026042938233); // Define the minimum coordinates of the box
+        rib_bbox.max.set(-1.11372398376464776, 2.3717719459533697, -0.6895980262756338);   // Define the maximum coordinates of the box
+        rib_helper = new THREE.Box3Helper( rib_bbox, 0x66FF00 );
+        scene.add(rib_helper)
+
+        if (bbox.intersectsBox(rib_bbox)) {
+            console.log('intersection')
+            if (selected.name == 'scalpel') //good 
+            {
+                stage = 'remove';
+                console.log('stab ribcage')
+                ribcage.visible = false;
+                rib_helper.visible = false;
+            }
+            else //bad 
+            {
+                console.log('wrong tool')
+            }
         }
-        else //bad 
-        {
-            console.log('wrong tool')
-        }
+    } else if (stage == 'remove') // remove heart with tweezers
+    {
+        heart_bbox = new THREE.Box3().setFromObject(heart);
+        heart_helper = new THREE.Box3Helper( rib_bbox, 0x66FF00 );
+        scene.add(heart_helper)
+
+        if (bbox.intersectsBox(heart_bbox)) {
+            console.log('intersection')
+            if (selected.name == 'tweezers') //good 
+            {
+                stage = 'replace';
+                console.log('removed heart')
+                isFlatlined = !isFlatlined;
+                heart.visible = false;
+                scene.remove(heart_helper)
+                heart_helper = null
+            }
+            else //bad 
+            {
+                console.log('wrong tool')
+            }
+         }
+    } else if (stage == 'replace') // replace heart
+    {
+        rib_bbox.min.set(-3.0, 1.0282559585571287, -5.912026042938233); // Define the minimum coordinates of the box
+        rib_bbox.max.set(-1.11372398376464776, 2.3717719459533697, -0.6895980262756338);   // Define the maximum coordinates of the box
+        let rib_helper = new THREE.Box3Helper( rib_bbox, 0x66FF00 );
+        scene.add(rib_helper)
+        rib_helper.visible = true;
+
+        if (bbox.intersectsBox(rib_bbox)) {
+            console.log('intersection')
+            if (selected.name == 'remeshed' || selected.name == 'heart') //good 
+            {
+                stage = 'done';
+                console.log('heart replaced')
+                isFlatlined = !isFlatlined;
+                scene.remove(rib_helper)
+                rib_helper = null
+
+                // place new heart in ribcage
+                detach();
+                heart.visible = true;
+                scene.remove(heart2)
+                heart2 = null
+                //heart2.position.set(9.52, -1.5, 1.5)
+            }
+            else //bad 
+            {
+                console.log('wrong tool')
+            }
+         }
     }
         //return
 }
@@ -1653,10 +1706,6 @@ function animate() {
     }
 
     // stage based logic
-
-    if (stage == 'remove' && tools['scalpel'].mesh.material.opacity > 0) {
-        tools['scalpel'].mesh.material.opacity -= .05
-    }
 }
 renderer.setAnimationLoop( animate );
 
