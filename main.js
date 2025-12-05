@@ -99,6 +99,194 @@ function scaleMatrix(sx, sy, sz) {
 	);
 }
 
+//////////////////////////
+////// shaders ///////////
+
+class waveForm_render {
+    vertexShader() {
+        return `
+        varying vec2 vUv;
+        varying vec3 vPosition;
+        void main() {
+            vUv = uv;
+            vPosition = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+        }
+        `;
+    }
+
+    fragmentShader() {
+        return `
+        #define S smoothstep
+        #define e 2.71828
+        #define T (iTime * 0.5)
+
+        void mainImage( out vec4 fragColor, in vec2 fragCoord )
+        {
+            vec2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
+            float t = mod(uv.x + T, 0.4);
+            
+            // bool alive = mod(uv.x + T, 5.0) > 0.8 ? true : false;
+            bool alive = true;
+            
+            float dotr = 0.02;
+            
+            float pw = 0.4;
+            float mark = 0.7;
+            float atten = pow(e, -15. * t);
+            
+            float dotY = (t >= 0.0 && t < pw && alive) ? 0.3*sin(t * 50.0)*atten : 0.0;
+            
+            float d = length(uv - vec2(uv.x , dotY));
+            float a = uv.x < mark ? S(0.0, 0.001, 0.005 - d) : 0.0;
+            
+            
+            d = length(uv - vec2(mark , dotY));
+            float b = uv.x < mark + dotr ? S(0.0, 0.001, dotr - d) : 0.0;
+            
+            vec3 col = vec3(0.0, a + b, 0.0);
+
+            fragColor = vec4(col, 1.0); 
+        }
+        `;
+    }
+}
+
+// Custom Phong Shader has already been implemented, no need to make change.
+function createPhongMaterial(materialProperties) {
+    const numLights = 3;
+    
+    // convert shape_color1 to a Vector4
+    let shape_color_representation = new THREE.Color(materialProperties.color);
+    let shape_color = new THREE.Vector4(
+        shape_color_representation.r,
+        shape_color_representation.g,
+        shape_color_representation.b,
+        1.0
+    );
+
+    // Vertex Shader
+    let vertexShader = `
+        precision mediump float;
+        const int N_LIGHTS = ${numLights};
+        uniform float ambient, diffusivity, specularity, smoothness;
+        uniform vec4 light_positions_or_vectors[N_LIGHTS];
+        uniform vec4 light_colors[N_LIGHTS];
+        uniform float light_attenuation_factors[N_LIGHTS];
+        uniform vec4 shape_color;
+        uniform vec3 squared_scale;
+        uniform vec3 camera_center;
+        varying vec3 N, vertex_worldspace;
+
+        // ***** PHONG SHADING HAPPENS HERE: *****
+        vec3 phong_model_lights(vec3 N, vec3 vertex_worldspace) {
+            vec3 E = normalize(camera_center - vertex_worldspace); // View direction
+            vec3 result = vec3(0.0); // Initialize the output color
+            for(int i = 0; i < N_LIGHTS; i++) {
+                // Calculate the vector from the surface to the light source
+                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
+                    light_positions_or_vectors[i].w * vertex_worldspace;
+                float distance_to_light = length(surface_to_light_vector); // Light distance
+                vec3 L = normalize(surface_to_light_vector); // Light direction
+                
+                // Phong uses the reflection vector R
+                vec3 R = reflect(-L, N); // Reflect L around the normal N
+                
+                float diffuse = max(dot(N, L), 0.0); // Diffuse term
+                float specular = pow(max(dot(R, E), 0.0), smoothness); // Specular term
+                
+                // Light attenuation
+                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light);
+                
+                // Calculate the contribution of this light source
+                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
+                                        + light_colors[i].xyz * specularity * specular;
+                result += attenuation * light_contribution;
+            }
+            return result;
+        }
+
+        uniform mat4 model_transform;
+        uniform mat4 projection_camera_model_transform;
+
+        void main() {
+            gl_Position = projection_camera_model_transform * vec4(position, 1.0);
+            N = normalize(mat3(model_transform) * normal / squared_scale);
+            vertex_worldspace = (model_transform * vec4(position, 1.0)).xyz;
+        }
+    `;
+    // Fragment Shader
+    let fragmentShader = `
+        precision mediump float;
+        const int N_LIGHTS = ${numLights};
+        uniform float ambient, diffusivity, specularity, smoothness;
+        uniform vec4 light_positions_or_vectors[N_LIGHTS];
+        uniform vec4 light_colors[N_LIGHTS];
+        uniform float light_attenuation_factors[N_LIGHTS];
+        uniform vec4 shape_color;
+        uniform vec3 camera_center;
+        varying vec3 N, vertex_worldspace;
+
+        // ***** PHONG SHADING HAPPENS HERE: *****
+        vec3 phong_model_lights(vec3 N, vec3 vertex_worldspace) {
+            vec3 E = normalize(camera_center - vertex_worldspace); // View direction
+            vec3 result = vec3(0.0); // Initialize the output color
+            for(int i = 0; i < N_LIGHTS; i++) {
+                // Calculate the vector from the surface to the light source
+                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
+                    light_positions_or_vectors[i].w * vertex_worldspace;
+                float distance_to_light = length(surface_to_light_vector); // Light distance
+                vec3 L = normalize(surface_to_light_vector); // Light direction
+                
+                // Phong uses the reflection vector R
+                vec3 R = reflect(-L, N); // Reflect L around the normal N
+                
+                float diffuse = max(dot(N, L), 0.0); // Diffuse term
+                float specular = pow(max(dot(R, E), 0.0), smoothness); // Specular term
+                
+                // Light attenuation
+                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light);
+                
+                // Calculate the contribution of this light source
+                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
+                                        + light_colors[i].xyz * specularity * specular;
+                result += attenuation * light_contribution;
+            }
+            return result;
+        }
+
+        void main() {
+            // Compute an initial (ambient) color:
+            vec4 color = vec4(shape_color.xyz * ambient, shape_color.w);
+            // Compute the final color with contributions from lights:
+            color.xyz += phong_model_lights(normalize(N), vertex_worldspace);
+            gl_FragColor = color;
+        }
+    `;
+    // Prepare uniforms
+    const uniforms = {
+        ambient: { value: materialProperties.ambient },
+        diffusivity: { value: materialProperties.diffusivity },
+        specularity: { value: materialProperties.specularity },
+        smoothness: { value: materialProperties.smoothness },
+        shape_color: { value: shape_color },
+        squared_scale: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
+        camera_center: { value: new THREE.Vector3() },
+        model_transform: { value: new THREE.Matrix4() },
+        projection_camera_model_transform: { value: new THREE.Matrix4() },
+        light_positions_or_vectors: { value: [] },
+        light_colors: { value: [] },
+        light_attenuation_factors: { value: [] }
+    };
+
+    // Create the ShaderMaterial using the custom vertex and fragment shaders
+    return new THREE.ShaderMaterial({
+        vertexShader: vertexShader,
+        fragmentShader: fragmentShader,
+        uniforms: uniforms
+    });
+}
+
 //////////////////////////////////
 
 // walls
@@ -292,6 +480,23 @@ function loadModel(obj, path, material, trans, scale) {
 let heart;
 let heart2;
 
+const textureLoader = new THREE.TextureLoader();
+const heart_diffuse = textureLoader.load('models/heart/texture_diffuse.png');
+const heart_metallic = textureLoader.load('models/heart/texture_metallic.png');
+const heart_normal = textureLoader.load('models/heart/texture_normal.png');
+const heart_pbr = textureLoader.load('models/heart/texture_pbr.png');
+const heart_roughness = textureLoader.load('models/heart/texture_roughness.png');
+
+const heart_material = new THREE.MeshStandardMaterial({
+      map: heart_diffuse,
+      normalMap: heart_normal,
+      roughnessMap: heart_roughness,
+      roughness: 1,
+      metalnessMap: heart_metallic,
+      metalness: 0.1,  
+      bumpMap: heart_pbr,
+});
+
 loader.load(
     'models/heart/base.obj',
     (object) => {
@@ -305,7 +510,7 @@ loader.load(
 
         object.traverse((child) => {
             if (child.isMesh) {
-                child.material = heartMaterial;
+                child.material = heart_material;
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -353,7 +558,7 @@ loader.load(
 
         object.traverse((child) => {
             if (child.isMesh) {
-                child.material = heartMaterial;
+                child.material = heart_material;
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -369,7 +574,7 @@ loader.load(
         console.log('Vertices:', object.children[0].geometry.attributes.position.count);
 
 
-        let heartm = translationMatrix(9.5, -1, 2);
+        let heartm = translationMatrix(9.5, -1.1, 2);
         let heart_rotx = rotationMatrixX(-Math.PI / 2.0);
         let heartscale = scaleMatrix(0.7, 0.7, 0.7);
         let heart_transform = new THREE.Matrix4();
@@ -379,6 +584,13 @@ loader.load(
         heart_transform.multiplyMatrices(heartm, heart_transform);
 
         object.applyMatrix4(heart_transform)
+
+        tools['heart'] = { mesh: heart2.children[0],
+                wrapper: heart2, 
+                pos: heart2.position.clone(),
+                rot: heart2.quaternion.clone() };
+            console.log(heart2, tools['heart']);
+            console.log(tools['heart'].pos, tools['heart'].rot)
     },
     (xhr) => {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
@@ -488,7 +700,6 @@ const screen_mat = new THREE.MeshPhongMaterial( { color: 0x121212, ambient: 0.0,
 const screen = new THREE.Mesh( screen_geo, screen_mat );
 scene.add( screen );
 
-
 let screent = translationMatrix(5.5, 8, -11.5);
 let screenrotx = rotationMatrixX(Math.PI / 2.0);
 let screen_transform = new THREE.Matrix4();
@@ -509,9 +720,6 @@ const geometry = new MeshLineGeometry();
 //   new THREE.Vector3(-2, 6, 5),
 //   new THREE.Vector3(5, 2, -3),
 // ];
-
-
-
 
 // # very approximate sinusoidal representation
 function ecg(t, period) {
@@ -552,6 +760,7 @@ const lineMaterial = new MeshLineMaterial({
   lineWidth: 0.25,
   resolution: new THREE.Vector2(window.innerWidth, window.innerHeight),
 });
+
 const mymesh = new THREE.Mesh(geometry, lineMaterial);
 screen.add(mymesh);
 
@@ -567,6 +776,7 @@ waveform_transform.multiplyMatrices(waveform_rot, waveform_transform);
 waveform_transform.multiplyMatrices(waveform_tx, waveform_transform);
 
 mymesh.applyMatrix4(waveform_transform);
+
 
 /////////////////////////////////////////////
 
@@ -747,237 +957,6 @@ gltf_loader.load(
         console.error('Error loading surgical tray:', error);
     }
 );
-
-
-// Gouraud Shader
-function createGouraudMaterial(materialProperties) {   
-    const numLights = 3;
-    let shape_color_representation = new THREE.Color(materialProperties.color);
-
-    let shape_color = new THREE.Vector4(
-        shape_color_representation.r,
-        shape_color_representation.g,
-        shape_color_representation.b,
-        1.0
-    ); 
-    
-    // Vertex Shader
-    let vertexShader = `
-        precision mediump float;
-        const int N_LIGHTS = ${numLights};
-        uniform float ambient, diffusivity, specularity, smoothness;
-        uniform vec4 light_positions_or_vectors[N_LIGHTS];
-        uniform vec4 light_colors[N_LIGHTS];
-        uniform float light_attenuation_factors[N_LIGHTS];
-        uniform vec4 shape_color;
-        uniform vec3 squared_scale;
-        uniform vec3 camera_center;
-        varying vec4 color;
-
-        vec3 gouraud_shading(vec3 N, vec3 vertex_worldspace) {
-            vec3 E = normalize(camera_center - vertex_worldspace);
-            vec3 result = shape_color.xyz * ambient; // Ambient term
-
-            for(int i = 0; i < N_LIGHTS; i++) {
-                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
-                    light_positions_or_vectors[i].w * vertex_worldspace;
-                float distance_to_light = length(surface_to_light_vector);
-                vec3 L = normalize(surface_to_light_vector);
-                vec3 R = reflect(-L, N);
-
-                float diffuse = max(dot(N, L), 0.0);
-                float specular = pow(max(dot(R, E), 0.0), smoothness);
-
-                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light);
-                
-                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
-                                        + light_colors[i].xyz * specularity * specular;
-                result += attenuation * light_contribution;
-            }
-            return result;
-        }
-
-        uniform mat4 model_transform;
-        uniform mat4 projection_camera_model_transform;
-
-        void main() {
-            gl_Position = projection_camera_model_transform * vec4(position, 1.0);
-            vec3 N_world = normalize(mat3(model_transform) * normal / squared_scale);
-            vec3 vertex_worldspace = (model_transform * vec4(position, 1.0)).xyz;
-            
-            // Compute lighting at each vertex
-            vec3 computed_color = gouraud_shading(N_world, vertex_worldspace);
-            color = vec4(computed_color, shape_color.w);
-        }
-    `;
-
-    // Fragment Shader
-    let fragmentShader = `
-        varying vec4 color;
-
-        void main() {
-            gl_FragColor = color;
-        }
-    `;
-    
-    // Uniforms
-    const uniforms = {
-        ambient: { value: materialProperties.ambient },
-        diffusivity: { value: materialProperties.diffusivity },
-        specularity: { value: materialProperties.specularity },
-        smoothness: { value: materialProperties.smoothness },
-        shape_color: { value: shape_color },
-        squared_scale: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
-        camera_center: { value: new THREE.Vector3() },
-        model_transform: { value: new THREE.Matrix4() },
-        projection_camera_model_transform: { value: new THREE.Matrix4() },
-        light_positions_or_vectors: { value: [] },
-        light_colors: { value: [] },
-        light_attenuation_factors: { value: [] }
-    };
-
-    // Create the ShaderMaterial using the custom vertex and fragment shaders
-    return new THREE.ShaderMaterial({
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader,
-        uniforms: uniforms
-    });
-}
-
-// Custom Phong Shader has already been implemented, no need to make change.
-function createPhongMaterial(materialProperties) {
-    const numLights = 3;
-    
-    // convert shape_color1 to a Vector4
-    let shape_color_representation = new THREE.Color(materialProperties.color);
-    let shape_color = new THREE.Vector4(
-        shape_color_representation.r,
-        shape_color_representation.g,
-        shape_color_representation.b,
-        1.0
-    );
-
-    // Vertex Shader
-    let vertexShader = `
-        precision mediump float;
-        const int N_LIGHTS = ${numLights};
-        uniform float ambient, diffusivity, specularity, smoothness;
-        uniform vec4 light_positions_or_vectors[N_LIGHTS];
-        uniform vec4 light_colors[N_LIGHTS];
-        uniform float light_attenuation_factors[N_LIGHTS];
-        uniform vec4 shape_color;
-        uniform vec3 squared_scale;
-        uniform vec3 camera_center;
-        varying vec3 N, vertex_worldspace;
-
-        // ***** PHONG SHADING HAPPENS HERE: *****
-        vec3 phong_model_lights(vec3 N, vec3 vertex_worldspace) {
-            vec3 E = normalize(camera_center - vertex_worldspace); // View direction
-            vec3 result = vec3(0.0); // Initialize the output color
-            for(int i = 0; i < N_LIGHTS; i++) {
-                // Calculate the vector from the surface to the light source
-                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
-                    light_positions_or_vectors[i].w * vertex_worldspace;
-                float distance_to_light = length(surface_to_light_vector); // Light distance
-                vec3 L = normalize(surface_to_light_vector); // Light direction
-                
-                // Phong uses the reflection vector R
-                vec3 R = reflect(-L, N); // Reflect L around the normal N
-                
-                float diffuse = max(dot(N, L), 0.0); // Diffuse term
-                float specular = pow(max(dot(R, E), 0.0), smoothness); // Specular term
-                
-                // Light attenuation
-                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light);
-                
-                // Calculate the contribution of this light source
-                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
-                                        + light_colors[i].xyz * specularity * specular;
-                result += attenuation * light_contribution;
-            }
-            return result;
-        }
-
-        uniform mat4 model_transform;
-        uniform mat4 projection_camera_model_transform;
-
-        void main() {
-            gl_Position = projection_camera_model_transform * vec4(position, 1.0);
-            N = normalize(mat3(model_transform) * normal / squared_scale);
-            vertex_worldspace = (model_transform * vec4(position, 1.0)).xyz;
-        }
-    `;
-    // Fragment Shader
-    let fragmentShader = `
-        precision mediump float;
-        const int N_LIGHTS = ${numLights};
-        uniform float ambient, diffusivity, specularity, smoothness;
-        uniform vec4 light_positions_or_vectors[N_LIGHTS];
-        uniform vec4 light_colors[N_LIGHTS];
-        uniform float light_attenuation_factors[N_LIGHTS];
-        uniform vec4 shape_color;
-        uniform vec3 camera_center;
-        varying vec3 N, vertex_worldspace;
-
-        // ***** PHONG SHADING HAPPENS HERE: *****
-        vec3 phong_model_lights(vec3 N, vec3 vertex_worldspace) {
-            vec3 E = normalize(camera_center - vertex_worldspace); // View direction
-            vec3 result = vec3(0.0); // Initialize the output color
-            for(int i = 0; i < N_LIGHTS; i++) {
-                // Calculate the vector from the surface to the light source
-                vec3 surface_to_light_vector = light_positions_or_vectors[i].xyz - 
-                    light_positions_or_vectors[i].w * vertex_worldspace;
-                float distance_to_light = length(surface_to_light_vector); // Light distance
-                vec3 L = normalize(surface_to_light_vector); // Light direction
-                
-                // Phong uses the reflection vector R
-                vec3 R = reflect(-L, N); // Reflect L around the normal N
-                
-                float diffuse = max(dot(N, L), 0.0); // Diffuse term
-                float specular = pow(max(dot(R, E), 0.0), smoothness); // Specular term
-                
-                // Light attenuation
-                float attenuation = 1.0 / (1.0 + light_attenuation_factors[i] * distance_to_light * distance_to_light);
-                
-                // Calculate the contribution of this light source
-                vec3 light_contribution = shape_color.xyz * light_colors[i].xyz * diffusivity * diffuse
-                                        + light_colors[i].xyz * specularity * specular;
-                result += attenuation * light_contribution;
-            }
-            return result;
-        }
-
-        void main() {
-            // Compute an initial (ambient) color:
-            vec4 color = vec4(shape_color.xyz * ambient, shape_color.w);
-            // Compute the final color with contributions from lights:
-            color.xyz += phong_model_lights(normalize(N), vertex_worldspace);
-            gl_FragColor = color;
-        }
-    `;
-    // Prepare uniforms
-    const uniforms = {
-        ambient: { value: materialProperties.ambient },
-        diffusivity: { value: materialProperties.diffusivity },
-        specularity: { value: materialProperties.specularity },
-        smoothness: { value: materialProperties.smoothness },
-        shape_color: { value: shape_color },
-        squared_scale: { value: new THREE.Vector3(1.0, 1.0, 1.0) },
-        camera_center: { value: new THREE.Vector3() },
-        model_transform: { value: new THREE.Matrix4() },
-        projection_camera_model_transform: { value: new THREE.Matrix4() },
-        light_positions_or_vectors: { value: [] },
-        light_colors: { value: [] },
-        light_attenuation_factors: { value: [] }
-    };
-
-    // Create the ShaderMaterial using the custom vertex and fragment shaders
-    return new THREE.ShaderMaterial({
-        vertexShader: vertexShader,
-        fragmentShader: fragmentShader,
-        uniforms: uniforms
-    });
-}
 
 // Handle window resize
 window.addEventListener('resize', onWindowResize, false);
