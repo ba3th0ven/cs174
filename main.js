@@ -23,7 +23,7 @@ camera.position.set(0, 10, 20);
 controls.target.set(0, 0, 0);
 
 const transformControls = new TransformControls(camera, renderer.domElement);
-scene.add(transformControls.getHelper());
+scene.add(transformControls);
 
 // prevent objects from being scaled
 /*
@@ -411,7 +411,7 @@ floor.applyMatrix4(floortransform);
 
 // Operating table
 const table = new THREE.Group()
-const tabletop_geometry = new THREE.BoxGeometry( 10, 1, 20 );
+const tabletop_geometry = new THREE.BoxGeometry( 12.7, 1, 23 );
 wall_back.add(wall_back_helper);
 
 const table_material = new THREE.MeshPhongMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
@@ -456,6 +456,8 @@ leg2.position.set(-4.5, -3, -9.5);
 leg3.position.set(4.5, -3, 9.5);
 leg4.position.set(-4.5, -3, 9.5);
 table.add(tabletop, leg1, leg2, leg3, leg4);
+
+table.position.set(-2.4, 0, -0.5);
 scene.add( table );
 
 //////////////////////////////////
@@ -637,7 +639,7 @@ loader.load(
         console.log('Vertices:', object.children[0].geometry.attributes.position.count);
 
 
-        let heartm = translationMatrix(0.2, 1.2, -4.5);
+        let heartm = translationMatrix(-2, 2, -4.5);
         let heart_rotx = rotationMatrixX(-Math.PI / 2.0);
         let heartscale = scaleMatrix(0.7, 0.7, 0.7);
         let heart_transform = new THREE.Matrix4();
@@ -719,11 +721,36 @@ loader.load(
     }
 );
 
+const body_diffuse = textureLoader.load('public/models/skin/skin_0001_color_4k.jpg');
+const body_metallic = textureLoader.load('models/heart/texture_metallic.png');
+const body_normal = textureLoader.load('public/models/skin/skin_0001_normal_directx_4k.png');
+const body_pbr = textureLoader.load('public/models/skin/skin_0001_height_4k.png');
+const body_roughness = textureLoader.load('public/models/skin/skin_0001_roughness_4k.jpg');
+
+
+
+const body_material = new THREE.MeshStandardMaterial({
+      map: body_diffuse,
+      normalMap: body_normal,
+      roughnessMap: body_roughness,
+      roughness: 1,
+      metalnessMap: body_metallic,
+      metalness: 0.01,  
+      bumpMap: body_pbr,
+});
+
+body_material.normalMap.wrapS = THREE.RepeatWrapping;
+body_material.normalMap.wrapT = THREE.RepeatWrapping;
+
+// body_material.normalMap.repeat.set(6, 6); // repeat the texture 4×4 times
+
+body_material.normalScale.set(0.2, 0.2); 
+
 const body_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 let body_helper;
 
 let humanbody;
-loader.load('models/humanbody.obj',(object) => {
+loader.load('models/final_body.obj',(object) => {
         // Create realistic body material
         const bodyMaterial = new THREE.MeshPhongMaterial({
             color: 0xe6bc98,
@@ -734,7 +761,7 @@ loader.load('models/humanbody.obj',(object) => {
 
         object.traverse((child) => {
             if (child.isMesh) {
-                child.material = bodyMaterial;
+                child.material = body_material;
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -753,7 +780,8 @@ loader.load('models/humanbody.obj',(object) => {
 
         let humanscale = 1.3;
 
-        let bodyt = translationMatrix(0, 0, -2);
+        let bodyt = translationMatrix(-3, 1.2, -1);
+
         let bodys = scaleMatrix(humanscale, humanscale, humanscale);
         let body_transform = new THREE.Matrix4();
 
@@ -915,7 +943,23 @@ mymesh.applyMatrix4(waveform_transform);
 
 let blanket;
 
-loader.load('models/blanket2.obj',(object) => {
+const blanket_diffuse = textureLoader.load('public/models/blanket/fabric_126_albedo-1K.png');
+const blanket_metallic = textureLoader.load('public/models/blanket/fabric_126_ambientocclusion-1K.png');
+const blanket_normal = textureLoader.load('public/models/blanket/fabric_126_normal-1K.png');
+const blanket_pbr = textureLoader.load('public/models/blanket/fabric_126_height-1K.png');
+const blanket_roughness = textureLoader.load('public/models/blanket/fabric_126_roughness-1K.png');
+
+const blanket_material = new THREE.MeshStandardMaterial({
+      map: blanket_diffuse,
+      normalMap: blanket_normal,
+      roughnessMap: blanket_roughness,
+      roughness: 1,
+      metalnessMap: blanket_metallic,
+      metalness: 0.5,  
+      bumpMap: blanket_pbr,
+});
+
+loader.load('models/blanket_final.obj',(object) => {
         // Create realistic body material
         const blanketMat = new THREE.MeshPhongMaterial({
             color: 0x89CFFF,
@@ -926,7 +970,7 @@ loader.load('models/blanket2.obj',(object) => {
 
         object.traverse((child) => {
             if (child.isMesh) {
-                child.material = blanketMat;
+                child.material = blanket_material;
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -941,7 +985,7 @@ loader.load('models/blanket2.obj',(object) => {
 
         let blanketscale = 1.3;
 
-        let blankett = translationMatrix(0.0, 0.45, -2.0);
+        let blankett = translationMatrix(-3.0, 2.0, -1.15);
         let blankets = scaleMatrix(blanketscale*0.95, blanketscale*0.95, blanketscale);
         let blanket_transform = new THREE.Matrix4();
 
@@ -1044,8 +1088,8 @@ gltf_loader.load(
             let bbox = new THREE.Box3().setFromObject(tool);
             let center = bbox.getCenter(new THREE.Vector3());
 
-            helper = new THREE.Box3Helper( bbox, 0xffff00 );
-            tool.add(helper)
+            // helper = new THREE.Box3Helper( bbox, 0xffff00 );
+            // tool.add(helper)
 
             // wrapper so we can translate dynamically
             let wrapper = new THREE.Object3D();
@@ -1057,7 +1101,7 @@ gltf_loader.load(
 
             tools[key] = { mesh: tool,
                 wrapper: wrapper, 
-                helper: helper,
+                // helper: helper,
                 pos: wrapper.position.clone(),
                 rot: wrapper.quaternion.clone() };
             console.log(key, tools[key]);
