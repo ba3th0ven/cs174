@@ -32,6 +32,36 @@ transformControls.showY = false;
 transformControls.showZ = false;
 */
 
+/////// Canvas for instructions ////////
+// TODO: why is the canvas not showing up brah
+
+// Create a canvas element
+const canvas = document.createElement('canvas');
+canvas.width = 256; // Set appropriate dimensions
+canvas.height = 128;
+const ctx = canvas.getContext('2d');
+
+// Configure and draw text on the canvas
+ctx.fillStyle = 'white';
+ctx.font = '48px sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('Click on the correct tools to ', canvas.width / 2, canvas.height / 2);
+
+// Create a CanvasTexture from the canvas
+const texture = new THREE.CanvasTexture(canvas);
+texture.needsUpdate = true; // Important for dynamic updates
+
+// Create a material and a sprite
+const material = new THREE.SpriteMaterial({ map: texture });
+const sprite = new THREE.Sprite(material);
+
+// Position and add the sprite to the scene
+sprite.position.set(0, 0, 0); // Adjust position as needed
+scene.add(sprite);
+
+/////////////// Lights/Rays ///////////////
+
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hovered = null;
@@ -301,6 +331,24 @@ const wall_right = new THREE.Mesh( wallgeo, wallmaterial );
 const wall_left = new THREE.Mesh( wallgeo, wallmaterial );
 scene.add( wall_back, wall_right, wall_left);
 
+const wall_back_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+wall_back_bbox.setFromObject(wall_back);
+const wall_back_helper = new THREE.Box3Helper( wall_back_bbox, 0xffff00 );
+wall_back.add(wall_back_helper);
+wall_back_helper.visible = false;
+
+const wall_right_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+wall_right_bbox.setFromObject(wall_right);
+const wall_right_helper = new THREE.Box3Helper( wall_right_bbox, 0xffff00 );
+wall_right.add(wall_right_helper);
+wall_right_helper.visible = false;
+
+const wall_left_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+wall_left_bbox.setFromObject(wall_left);
+const wall_left_helper = new THREE.Box3Helper( wall_left_bbox, 0xffff00 );
+wall_left.add(wall_left_helper);
+wall_left_helper.visible = false;
+
 let scaley = scaleMatrix(1, 0.6, 1);
 
 let walltx = translationMatrix(0, wallup, -20);
@@ -314,7 +362,6 @@ walltransform.multiplyMatrices(scaley, walltransform);
 
 wall_back.applyMatrix4(walltransform);
 
-
 // right and left walls
 let wall_tleft = translationMatrix(-20, wallup, 0);
 let wall_tright = translationMatrix(20, wallup, 0);
@@ -325,7 +372,6 @@ walltransform = new THREE.Matrix4();
 walltransform.multiplyMatrices(wall_rotz, walltransform);
 walltransform.multiplyMatrices(wall_tleft, walltransform);
 walltransform.multiplyMatrices(scaley, walltransform);
-
 wall_left.applyMatrix4(walltransform);
 
 walltransform = new THREE.Matrix4();
@@ -345,6 +391,11 @@ const floormaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0
 const floor = new THREE.Mesh( floorgeo, floormaterial );
 scene.add( floor );
 
+const floor_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+floor_bbox.setFromObject(floor);
+const floor_helper = new THREE.Box3Helper( floor_bbox, 0xffff00 );
+floor.add(floor_helper);
+
 let floort = translationMatrix(0, -6, 0);
 let floortransform = new THREE.Matrix4();
 
@@ -361,14 +412,44 @@ floor.applyMatrix4(floortransform);
 // Operating table
 const table = new THREE.Group()
 const tabletop_geometry = new THREE.BoxGeometry( 10, 1, 20 );
+wall_back.add(wall_back_helper);
+
 const table_material = new THREE.MeshPhongMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 const tabletop = new THREE.Mesh( tabletop_geometry, table_material );
+const tabletop_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+tabletop_bbox.setFromObject(tabletop);
+const tabletop_helper = new THREE.Box3Helper( tabletop_bbox, 0xffff00 );
+tabletop.add(tabletop_helper)
+tabletop_helper.visible = false
 
 const leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 7, 32 );
 const leg1 = new THREE.Mesh( leg_geometry, table_material );
+const leg1_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+leg1_bbox.setFromObject(leg1);
+const leg1_helper = new THREE.Box3Helper( leg1_bbox, 0xffff00 );
+leg1.add(leg1_helper)
+leg1_helper.visible = false
+
 const leg2 = new THREE.Mesh( leg_geometry, table_material );
+const leg2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+leg2_bbox.setFromObject(leg2);
+const leg2_helper = new THREE.Box3Helper( leg2_bbox, 0xffff00 );
+leg2.add(leg2_helper)
+leg2_helper.visible = false
+
 const leg3 = new THREE.Mesh( leg_geometry, table_material );
+const leg3_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+leg3_bbox.setFromObject(leg3);
+const leg3_helper = new THREE.Box3Helper( leg3_bbox, 0xffff00 );
+leg3.add(leg3_helper)
+leg2_helper.visible = false
+
 const leg4 = new THREE.Mesh( leg_geometry, table_material );
+const leg4_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+leg4_bbox.setFromObject(leg4);
+const leg4_helper = new THREE.Box3Helper( leg4_bbox, 0xffff00 );
+leg4.add(leg4_helper)
+leg4_helper.visible = false
 
 leg1.position.set(4.5, -3, -9.5);
 leg2.position.set(-4.5, -3, -9.5);
@@ -384,18 +465,41 @@ scene.add( table );
 
 //////////////////////////////////
 
-// Second smaller table
+// Second smaller table for tools
 const table2_geo = new THREE.BoxGeometry( 10, 2, 20 );
 const table2_material = new THREE.MeshPhongMaterial( { color: 0x4d6966, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 
 const table2 = new THREE.Mesh( table2_geo, table2_material );
 scene.add( table2 );
+const table2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+table2_bbox.setFromObject(table2);
+const table2_helper = new THREE.Box3Helper( table2_bbox, 0xffff00 );
+table2.add(table2_helper)
 
 const table2_leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 10, 32 );
 const table_leg1 = new THREE.Mesh( table2_leg_geometry, table2_material );
+const table_leg1_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+table_leg1_bbox.setFromObject(table_leg1);
+const table_leg1_helper = new THREE.Box3Helper( table_leg1_bbox, 0xffff00 );
+table_leg1.add(table_leg1_helper)
+
 const table_leg2 = new THREE.Mesh( table2_leg_geometry, table2_material );
+const table_leg2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+table_leg2_bbox.setFromObject(table_leg2);
+const table_leg2_helper = new THREE.Box3Helper( table_leg2_bbox, 0xffff00 );
+table_leg2.add(table_leg2_helper)
+
 const table_leg3 = new THREE.Mesh( table2_leg_geometry, table2_material );
+const table_leg3_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+table_leg3_bbox.setFromObject(table_leg3);
+const table_leg3_helper = new THREE.Box3Helper( table_leg3_bbox, 0xffff00 );
+table_leg3.add(table_leg3_helper)
+
 const table_leg4 = new THREE.Mesh( table2_leg_geometry, table2_material );
+const table_leg4_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+table_leg4_bbox.setFromObject(table_leg4);
+const table_leg4_helper = new THREE.Box3Helper( table_leg4_bbox, 0xffff00 );
+table_leg4.add(table_leg4_helper)
 
 table_leg1.position.set(4.5, -5, -9.5);
 table_leg2.position.set(-4.5, -5, -9.5);
@@ -497,6 +601,9 @@ const heart_material = new THREE.MeshStandardMaterial({
       bumpMap: heart_pbr,
 });
 
+const heart_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+let heart_helper;
+
 loader.load(
     'models/heart/base.obj',
     (object) => {
@@ -522,6 +629,10 @@ loader.load(
         heart = object;
         scene.add(heart);
 
+        heart_bbox.setFromObject(heart);
+        heart_helper = new THREE.Box3Helper( heart_bbox, 0xffff00 );
+        heart.add(heart_helper)
+
         console.log('Heart loaded successfully!');
         console.log('Vertices:', object.children[0].geometry.attributes.position.count);
 
@@ -544,6 +655,9 @@ loader.load(
         console.error('Error loading heart model:', error);
     }
 );
+
+const heart2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+let heart2_helper;
 
 loader.load(
     'models/heart/base.obj',
@@ -570,6 +684,10 @@ loader.load(
         heart2 = object;
         scene.add(heart2);
 
+        heart2_bbox.setFromObject(heart2);
+        heart2_helper = new THREE.Box3Helper( heart2_bbox, 0xffff00 );
+        heart2.add(heart2_helper)
+
         console.log('Heart loaded successfully!');
         console.log('Vertices:', object.children[0].geometry.attributes.position.count);
 
@@ -587,6 +705,7 @@ loader.load(
 
         tools['heart'] = { mesh: heart2.children[0],
                 wrapper: heart2, 
+                helper: heart2_helper,
                 pos: heart2.position.clone(),
                 rot: heart2.quaternion.clone() };
             console.log(heart2, tools['heart']);
@@ -599,6 +718,9 @@ loader.load(
         console.error('Error loading heart model:', error);
     }
 );
+
+const body_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+let body_helper;
 
 let humanbody;
 loader.load('models/humanbody.obj',(object) => {
@@ -625,6 +747,10 @@ loader.load('models/humanbody.obj',(object) => {
         humanbody = object;
         scene.add(humanbody);
 
+        body_bbox.setFromObject(humanbody);
+        body_helper = new THREE.Box3Helper( body_bbox, 0xffff00 );
+        humanbody.add(body_helper)
+
         let humanscale = 1.3;
 
         let bodyt = translationMatrix(0, 0, -2);
@@ -650,6 +776,9 @@ loader.load('models/humanbody.obj',(object) => {
 
 //////////////////////////////////
 
+const cardiogram_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
+let cardiogram_helper;
+
 //cardiogram
 loader.load('models/cardiogram.obj',(object) => {
         const cardiogram_mat = new THREE.MeshPhongMaterial({
@@ -672,6 +801,10 @@ loader.load('models/cardiogram.obj',(object) => {
 
         scene.add(object);
 
+        cardiogram_bbox.setFromObject(object);
+        cardiogram_helper = new THREE.Box3Helper( cardiogram_bbox, 0xffff00 );
+        object.add(cardiogram_helper)
+
         let cardscale = 1.7;
 
         let cardt = translationMatrix(5.5, -5.5, -12);
@@ -688,7 +821,7 @@ loader.load('models/cardiogram.obj',(object) => {
     }, (xhr) => {
         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
     }, (error) => {
-        console.error('Error loading body model:', error);
+        console.error('Error loading cardiogram model:', error);
     }
 );
 
@@ -911,6 +1044,9 @@ gltf_loader.load(
             let bbox = new THREE.Box3().setFromObject(tool);
             let center = bbox.getCenter(new THREE.Vector3());
 
+            helper = new THREE.Box3Helper( bbox, 0xffff00 );
+            tool.add(helper)
+
             // wrapper so we can translate dynamically
             let wrapper = new THREE.Object3D();
             wrapper.position.copy(center);
@@ -921,6 +1057,7 @@ gltf_loader.load(
 
             tools[key] = { mesh: tool,
                 wrapper: wrapper, 
+                helper: helper,
                 pos: wrapper.position.clone(),
                 rot: wrapper.quaternion.clone() };
             console.log(key, tools[key]);
@@ -1043,6 +1180,7 @@ function onKeyDown(event){
             }
             break;
         case 88: // x for reset
+            // TODO: this part doesn't work
             // for (tool in tools)
             resetting = true;
             transformControls.detach();
@@ -1211,6 +1349,10 @@ function animate() {
 
     let period10 = time % 1;
 
+    Object.values(tools).forEach(tool => {
+        console.log(tool, tool.helper)
+    })
+
     if (resetting) {
         let stillAnimating = false;
 
@@ -1243,6 +1385,8 @@ function animate() {
             resetting = false;
         }
     }
+
+    // TODO: add collision logic
 
     let heartbeat_scale = 1;
     let suncolormod = 0;
