@@ -136,10 +136,8 @@ class waveForm_render {
     vertexShader() {
         return `
         varying vec2 vUv;
-        varying vec3 vPosition;
         void main() {
             vUv = uv;
-            vPosition = position;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
         }
         `;
@@ -149,34 +147,31 @@ class waveForm_render {
         return `
         #define S smoothstep
         #define e 2.71828
-        #define T (iTime * 0.5)
+        #define T (animation_time * 0.5)
 
-        void mainImage( out vec4 fragColor, in vec2 fragCoord )
-        {
-            vec2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
-            float t = mod(uv.x + T, 0.4);
+        uniform float beatPeriod;
+        uniform float animation_time;
+        varying vec2 vUv;
+        void main() {
+            vec2 uv = vec2(vUv.x, vUv.y - 0.5);
             
-            // bool alive = mod(uv.x + T, 5.0) > 0.8 ? true : false;
-            bool alive = true;
-            
-            float dotr = 0.02;
-            
-            float pw = 0.4;
             float mark = 0.7;
-            float atten = pow(e, -15. * t);
+            float r = 0.01;
             
-            float dotY = (t >= 0.0 && t < pw && alive) ? 0.3*sin(t * 50.0)*atten : 0.0;
+            float t = mod(uv.x+T, beatPeriod);
+            float attn = pow(e, -20.*t);
             
-            float d = length(uv - vec2(uv.x , dotY));
-            float a = uv.x < mark ? S(0.0, 0.001, 0.005 - d) : 0.0;
+            float y = 0.3*sin(t*60.0)*attn;
             
-            
-            d = length(uv - vec2(mark , dotY));
-            float b = uv.x < mark + dotr ? S(0.0, 0.001, dotr - d) : 0.0;
-            
-            vec3 col = vec3(0.0, a + b, 0.0);
+            float d = length(uv - vec2(uv.x, y));
+            float a = uv.x < mark ? S(0.0, 0.001, 0.005-d) : 0.;
 
-            fragColor = vec4(col, 1.0); 
+            d = length(uv - vec2(mark, y));
+            float b = uv.x < mark+r ? S(0.0, 0.001, r-d) : 0.;
+
+            vec3 col = vec3(b, a+b, b);
+
+            gl_FragColor = vec4(col,1.0);
         }
         `;
     }
@@ -326,9 +321,28 @@ let wallup = 10;
 const wallgeo = new THREE.BoxGeometry( walllen, 0.2, walllen );
 const wallmaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 
-const wall_back = new THREE.Mesh( wallgeo, wallmaterial );
-const wall_right = new THREE.Mesh( wallgeo, wallmaterial );
-const wall_left = new THREE.Mesh( wallgeo, wallmaterial );
+
+const textureLoader = new THREE.TextureLoader();
+const wall_diffuse = textureLoader.load('public/models/walls/modern-fractured-wallpaper_albedo.png');
+const wall_metallic = textureLoader.load('public/models/walls/modern-fractured-wallpaper_metallic.png');
+const wall_normal = textureLoader.load('public/models/walls/modern-fractured-wallpaper_normal-ogl.png');
+const wall_pbr = textureLoader.load('public/models/walls/modern-fractured-wallpaper_height.png');
+const wall_roughness = textureLoader.load('public/models/walls/modern-fractured-wallpaper_roughness.png');
+
+const wall_material = new THREE.MeshStandardMaterial({
+      map: wall_diffuse,
+      normalMap: wall_normal,
+      roughnessMap: wall_roughness,
+      roughness: 1,
+      metalnessMap: wall_metallic,
+      metalness: 0.1,  
+      bumpMap: wall_pbr,
+});
+
+
+const wall_back = new THREE.Mesh( wallgeo, wall_material );
+const wall_right = new THREE.Mesh( wallgeo, wall_material );
+const wall_left = new THREE.Mesh( wallgeo, wall_material );
 scene.add( wall_back, wall_right, wall_left);
 
 const wall_back_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
@@ -388,7 +402,23 @@ wall_right.applyMatrix4(walltransform);
 const floorgeo = new THREE.BoxGeometry( 40, 0.2, 40 );
 const floormaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 
-const floor = new THREE.Mesh( floorgeo, floormaterial );
+const floor_diffuse = textureLoader.load('public/models/base-white-tile-bl/base-white-tile_albedo.png');
+const floor_metallic = textureLoader.load('public/models/base-white-tile-bl/base-white-tile_metallic.png');
+const floor_normal = textureLoader.load('public/models/base-white-tile-bl/base-white-tile_normal-ogl.png');
+const floor_pbr = textureLoader.load('public/models/base-white-tile-bl/base-white-tile_height.png');
+const floor_roughness = textureLoader.load('public/models/base-white-tile-bl/base-white-tile_roughness.png');
+
+const floor_material = new THREE.MeshStandardMaterial({
+      map: floor_diffuse,
+      normalMap: floor_normal,
+      roughnessMap: floor_roughness,
+      roughness: 1,
+      metalnessMap: floor_metallic,
+      metalness: 0.1,  
+      bumpMap: floor_pbr,
+});
+
+const floor = new THREE.Mesh( floorgeo, floor_material );
 scene.add( floor );
 
 const floor_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
@@ -414,7 +444,26 @@ const table = new THREE.Group()
 const tabletop_geometry = new THREE.BoxGeometry( 12.7, 1, 23 );
 wall_back.add(wall_back_helper);
 
-const table_material = new THREE.MeshPhongMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
+const table_diffuse = textureLoader.load('public/models/grey-upholstery-bl/grey-upholstery_albedo.png');
+const table_metallic = textureLoader.load('public/models/grey-upholstery-bl/grey-upholstery_metallic.png');
+const table_normal = textureLoader.load('public/models/grey-upholstery-bl/grey-upholstery_normal-ogl.png');
+const table_pbr = textureLoader.load('public/models/grey-upholstery-bl/grey-upholstery_height.png');
+const table_roughness = textureLoader.load('public/models/grey-upholstery-bl/grey-upholstery_roughness.png');
+
+
+
+const table_material = new THREE.MeshStandardMaterial({
+      map: table_diffuse,
+      normalMap: table_normal,
+      roughnessMap: table_roughness,
+      roughness: 0.6,
+      metalnessMap: table_metallic,
+      metalness: 0.50,  
+      bumpMap: table_pbr,
+      side: THREE.DoubleSide
+});
+
+// const table_material = new THREE.MeshPhongMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 const tabletop = new THREE.Mesh( tabletop_geometry, table_material );
 const tabletop_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 tabletop_bbox.setFromObject(tabletop);
@@ -451,10 +500,10 @@ const leg4_helper = new THREE.Box3Helper( leg4_bbox, 0xffff00 );
 leg4.add(leg4_helper)
 leg4_helper.visible = false
 
-leg1.position.set(4.5, -3, -9.5);
-leg2.position.set(-4.5, -3, -9.5);
-leg3.position.set(4.5, -3, 9.5);
-leg4.position.set(-4.5, -3, 9.5);
+leg1.position.set(5.5, -3, -10.5);
+leg2.position.set(-5.5, -3, -10.5);
+leg3.position.set(5.5, -3, 10.5);
+leg4.position.set(-5.5, -3, 10.5);
 table.add(tabletop, leg1, leg2, leg3, leg4);
 
 table.position.set(-2.4, 0, -0.5);
@@ -586,7 +635,6 @@ function loadModel(obj, path, material, trans, scale) {
 let heart;
 let heart2;
 
-const textureLoader = new THREE.TextureLoader();
 const heart_diffuse = textureLoader.load('models/heart/texture_diffuse.png');
 const heart_metallic = textureLoader.load('models/heart/texture_metallic.png');
 const heart_normal = textureLoader.load('models/heart/texture_normal.png');
@@ -639,7 +687,7 @@ loader.load(
         console.log('Vertices:', object.children[0].geometry.attributes.position.count);
 
 
-        let heartm = translationMatrix(-2, 2, -4.5);
+        let heartm = translationMatrix(-2, 2.3, -4.5);
         let heart_rotx = rotationMatrixX(-Math.PI / 2.0);
         let heartscale = scaleMatrix(0.7, 0.7, 0.7);
         let heart_transform = new THREE.Matrix4();
@@ -721,6 +769,76 @@ loader.load(
     }
 );
 
+// Load ribcage model
+let ribcage;
+
+const rib_diffuse = textureLoader.load('models/heart/texture_diffuse.png');
+const rib_metallic = textureLoader.load('models/heart/texture_metallic.png');
+const rib_normal = textureLoader.load('models/heart/texture_normal.png');
+const rib_pbr = textureLoader.load('models/heart/texture_pbr.png');
+const rib_roughness = textureLoader.load('models/heart/texture_roughness.png');
+
+const rib_material = new THREE.MeshStandardMaterial({
+      map: rib_diffuse,
+      normalMap: rib_normal,
+      roughnessMap: rib_roughness,
+      roughness: 1,
+      metalnessMap: rib_metallic,
+      metalness: 0.1,  
+      bumpMap: rib_pbr,
+      DoubleSide: true
+});
+
+loader.load(
+    'public/models/12700_RibCage_v2.obj',
+    (object) => {
+        // Create realistic heart material
+        const heartMaterial = new THREE.MeshPhongMaterial({
+            color: 0x8B0000,
+            specular: 0x111111,
+            shininess: 30,
+            side: THREE.DoubleSide
+        });
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = rib_material;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+        ribcage = object;
+        scene.add(ribcage);
+
+        console.log('ribcage loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+
+        let rscaling = 0.07
+
+        let ribm = translationMatrix(-2.175, 2.2, -3.8);
+        let rib_rot = rotationMatrixZ(-Math.PI);
+        rib_rot = rib_rot.multiplyMatrices(rib_rot, rotationMatrixY(-Math.PI));
+        let ribscale = scaleMatrix(rscaling, rscaling, rscaling);
+        let rib_transform = new THREE.Matrix4();
+
+        rib_transform.multiplyMatrices(ribscale, rib_transform);
+        rib_transform.multiplyMatrices(rib_rot, rib_transform);
+        rib_transform.multiplyMatrices(ribm, rib_transform);
+
+        object.applyMatrix4(rib_transform)
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+        console.error('Error loading rib model:', error);
+    }
+);
+
 const body_diffuse = textureLoader.load('public/models/skin/skin_0001_color_4k.jpg');
 const body_metallic = textureLoader.load('models/heart/texture_metallic.png');
 const body_normal = textureLoader.load('public/models/skin/skin_0001_normal_directx_4k.png');
@@ -729,7 +847,7 @@ const body_roughness = textureLoader.load('public/models/skin/skin_0001_roughnes
 
 
 
-const body_material = new THREE.MeshStandardMaterial({
+const skin_material = new THREE.MeshStandardMaterial({
       map: body_diffuse,
       normalMap: body_normal,
       roughnessMap: body_roughness,
@@ -737,14 +855,15 @@ const body_material = new THREE.MeshStandardMaterial({
       metalnessMap: body_metallic,
       metalness: 0.01,  
       bumpMap: body_pbr,
+      side: THREE.DoubleSide
 });
 
-body_material.normalMap.wrapS = THREE.RepeatWrapping;
-body_material.normalMap.wrapT = THREE.RepeatWrapping;
+skin_material.normalMap.wrapS = THREE.RepeatWrapping;
+skin_material.normalMap.wrapT = THREE.RepeatWrapping;
 
 // body_material.normalMap.repeat.set(6, 6); // repeat the texture 4×4 times
 
-body_material.normalScale.set(0.2, 0.2); 
+skin_material.normalScale.set(0.2, 0.2); 
 
 const body_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 let body_helper;
@@ -761,7 +880,7 @@ loader.load('models/final_body.obj',(object) => {
 
         object.traverse((child) => {
             if (child.isMesh) {
-                child.material = body_material;
+                child.material = skin_material;
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -807,6 +926,25 @@ loader.load('models/final_body.obj',(object) => {
 const cardiogram_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 let cardiogram_helper;
 
+const ecg_diffuse = textureLoader.load('public/models/brushed-metal-bl/brushed-metal_albedo.png');
+const ecg_metallic = textureLoader.load('public/models/brushed-metal-bl/brushed-metal_metallic.png');
+const ecg_normal = textureLoader.load('public/models/brushed-metal-bl/brushed-metal_normal-ogl.png');
+const ecg_pbr = textureLoader.load('public/models/skin/skin_0001_height_4k.png');
+const ecg_roughness = textureLoader.load('public/models/brushed-metal-bl/brushed-metal_roughness.png');
+
+
+
+const ecg_material = new THREE.MeshStandardMaterial({
+      map: ecg_diffuse,
+      normalMap: ecg_normal,
+      roughnessMap: ecg_roughness,
+      roughness: 0.6,
+      metalnessMap: ecg_metallic,
+      metalness: 0.50,  
+      bumpMap: ecg_pbr,
+      side: THREE.DoubleSide
+});
+
 //cardiogram
 loader.load('models/cardiogram.obj',(object) => {
         const cardiogram_mat = new THREE.MeshPhongMaterial({
@@ -818,7 +956,7 @@ loader.load('models/cardiogram.obj',(object) => {
 
         object.traverse((child) => {
             if (child.isMesh) {
-                child.material = cardiogram_mat;
+                child.material = ecg_material;
                 child.castShadow = true;
                 child.receiveShadow = true;
 
@@ -855,10 +993,27 @@ loader.load('models/cardiogram.obj',(object) => {
 
 
 /////////////////////////////////////////////
-const screen_geo = new THREE.BoxGeometry( 5, 0.2, 2.8 );
+const screen_geo = new THREE.BoxGeometry( 4.8, 0.2, 2.8 );
+// const screen_geo = new THREE.PlaneGeometry(3, 2);
+
+let animation_time = 0.0;
+let waveform = new waveForm_render();
+
+const monitor_uniforms = {
+    beatPeriod: { value: 0.5 },
+    animation_time: { value: animation_time }
+};
+
+let screen_waveform = new THREE.ShaderMaterial({
+    uniforms: monitor_uniforms,
+    vertexShader: waveform.vertexShader(),
+    fragmentShader: waveform.fragmentShader(),
+
+});
+
 const screen_mat = new THREE.MeshPhongMaterial( { color: 0x121212, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 
-const screen = new THREE.Mesh( screen_geo, screen_mat );
+const screen = new THREE.Mesh( screen_geo, screen_waveform );
 scene.add( screen );
 
 let screent = translationMatrix(5.5, 8, -11.5);
@@ -923,7 +1078,7 @@ const lineMaterial = new MeshLineMaterial({
 });
 
 const mymesh = new THREE.Mesh(geometry, lineMaterial);
-screen.add(mymesh);
+// screen.add(mymesh);
 
 let scale = 0.1
 let waveform_scale = scaleMatrix(scale, scale, scale);
@@ -957,6 +1112,7 @@ const blanket_material = new THREE.MeshStandardMaterial({
       metalnessMap: blanket_metallic,
       metalness: 0.5,  
       bumpMap: blanket_pbr,
+      side: THREE.DoubleSide
 });
 
 loader.load('models/blanket_final.obj',(object) => {
@@ -1390,8 +1546,15 @@ function animate() {
 	renderer.render( scene, camera );
 
     let time = clock.getElapsedTime();
+  
+    let bpm = 80;
 
-    let period10 = time % 1;
+    let T = 60.0 / (bpm * 1.0);
+
+    let period = time % T;
+
+    monitor_uniforms.animation_time.value = period;
+    monitor_uniforms.beatPeriod.value = isFlatlined ? 1.0e10 : T;
 
     Object.values(tools).forEach(tool => {
         console.log(tool, tool.helper)
@@ -1435,11 +1598,11 @@ function animate() {
     let heartbeat_scale = 1;
     let suncolormod = 0;
 
-    if (period10 > 0.57) {
-        heartbeat_scale = -0.2 * period10 + 1.2;
-    } else if (period10 < 0.15) {} 
+    if (period > 0.57 * T) {
+        heartbeat_scale = (-0.2 * period / T + 1.2);
+    } else if (period < 0.15 * T) {} 
     else {
-        heartbeat_scale = 0.15 * period10 + 1;
+        heartbeat_scale = (0.15 * period / T + 1);
     }
 
     if (heart) {
@@ -1447,3 +1610,16 @@ function animate() {
     }
 }
 renderer.setAnimationLoop( animate );
+
+// Keyboard Event Listener
+let isFlatlined = false
+window.addEventListener('keydown', onKeyPress);
+function onKeyPress(event) {
+    switch (event.key) {
+        case 'f':
+        case 'F':
+            isFlatlined = !isFlatlined;
+        default:
+            break;
+    }
+}
