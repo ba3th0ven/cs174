@@ -1077,73 +1077,7 @@ loader.load('models/final_body.obj',(object) => {
 
         humanbody.applyMatrix4(body_transform)
 
-        humanbody.visible = false
-
         console.log('Body loaded successfully!');
-
-        if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
-            console.log('Vertices:', object.children[0].geometry.attributes.position.count);
-        }
-    }, (xhr) => {
-        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-    }, (error) => {
-        console.error('Error loading body model:', error);
-    }
-);
-
-
-loader.load('models/c_man.obj',(object) => {
-        // Create realistic body material
-        // Create realistic body material
-        const skin2_material = new THREE.MeshStandardMaterial({
-            map: body_diffuse,
-            normalMap: body_normal,
-            roughnessMap: body_roughness,
-            roughness: 1,
-            metalnessMap: body_metallic,
-            metalness: 0.01,  
-            bumpMap: body_pbr,
-            side: THREE.DoubleSide
-        });
-
-        skin2_material.normalMap.wrapS = THREE.RepeatWrapping;
-        skin2_material.normalMap.wrapT = THREE.RepeatWrapping;
-
-        // body_material.normalMap.repeat.set(6, 6); // repeat the texture 4×4 times
-
-        skin2_material.normalScale.set(0.2, 0.2); 
-
-        object.traverse((child) => {
-            if (child.isMesh) {
-                child.material = skin2_material;
-                child.castShadow = true;
-                child.receiveShadow = true;
-
-                // Compute normals for proper lighting
-                child.geometry.computeVertexNormals();
-            }
-        });
-
-        humanbody2 = object;
-        scene.add(humanbody2);
-
-        let humanscale = 1.3;
-
-        let bodyt = translationMatrix(-3, 1.2, -1);
-
-        let bodys = scaleMatrix(humanscale, humanscale, humanscale);
-        let body_transform = new THREE.Matrix4();
-
-        body_transform.multiplyMatrices(bodys, body_transform);
-        body_transform.multiplyMatrices(bodyt, body_transform);
-
-        let boundingBox = new THREE.Box3().setFromObject(sourceObject);
-        let sourceSize = new THREE.Vector3();
-        boundingBox.getSize(sourceSize);
-
-        console.log('Body loaded successfully!');
-
-        humanbody2.visible = true
 
         if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
             console.log('Vertices:', object.children[0].geometry.attributes.position.count);
@@ -1996,10 +1930,6 @@ function onObjectChange(event) {
                     rib_helper.visible = false
                     scene.remove(rib_helper)
                     rib_helper = null
-
-                    humanbody.visible = false
-                    humanbody2.visible = true
-
 
                     detach()
                     tools.needle.mesh.visible = false;
