@@ -1151,6 +1151,147 @@ loader.load('models/final_body.obj',(object) => {
     }
 );
 
+const hair_diffuse = textureLoader.load('public/models/human-head-with-short-hair/source/model/skincolor_diffuse.png');
+const hair_metallic = textureLoader.load('public/models/human-head-with-short-hair/source/model/texture_metallic.png');
+const hair_normal = textureLoader.load('public/models/human-head-with-short-hair/source/model/texture_normal.png');
+const hair_pbr = textureLoader.load('public/models/human-head-with-short-hair/source/model/texture_pbr.png');
+const hair_roughness = textureLoader.load('public/models/human-head-with-short-hair/source/model/texture_roughness.png');
+
+
+
+const hair_material = new THREE.MeshStandardMaterial({
+      map: hair_diffuse,
+      normalMap: hair_normal,
+      roughnessMap: hair_roughness,
+      roughness: 1,
+      metalnessMap: hair_metallic,
+      metalness: 0.01,  
+      bumpMap: hair_pbr,
+      side: THREE.DoubleSide
+});
+
+let hair;
+loader.load('models/gingerhair.obj',(object) => {
+        // Create realistic body material
+        const bodyMaterial = new THREE.MeshPhongMaterial({
+            color: 0xe6bc98,
+            specular: 0x111111,
+            shininess: 50,
+            side: THREE.DoubleSide
+        });
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = hair_material;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+
+        hair = object;
+        scene.add(hair);
+
+        let hairscale = 0.57;
+
+        let hairt = translationMatrix(-2.5, 3.5, -7.2);
+
+        let hairs = scaleMatrix(hairscale, hairscale, hairscale);
+        let hairrot = rotationMatrixX(-90 * Math.PI / 180.0);
+        let hairtransform = new THREE.Matrix4();
+
+        hairtransform.multiplyMatrices(hairs, hairtransform);
+        hairtransform.multiplyMatrices(hairrot, hairtransform);
+        hairtransform.multiplyMatrices(hairt, hairtransform);
+
+        hair.applyMatrix4(hairtransform)
+
+        console.log('hair loaded successfully!');
+
+        if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
+            console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+        }
+    }, (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    }, (error) => {
+        console.error('Error loading hair model:', error);
+    }
+);
+
+// const hair_diffuse = textureLoader.load('public/models/hair_texture/fabrics_0037_color_4k.jpg');
+// const hair_metallic = textureLoader.load('models/heart/texture_metallic.png');
+// const hair_normal = textureLoader.load('public/models/hair_texture/fabrics_0037_normal_directx_4k.png');
+// const hair_pbr = textureLoader.load('public/models/hair_texture/fabrics_0037_height_4k.png');
+// const hair_roughness = textureLoader.load('public/models/hair_texture/fabrics_0037_roughness_4k.jpg');
+
+
+
+// const hair_material = new THREE.MeshStandardMaterial({
+//       map: hair_diffuse,
+//       normalMap: hair_normal,
+//       roughnessMap: hair_roughness,
+//       roughness: 1,
+//       metalnessMap: hair_metallic,
+//       metalness: 0.01,  
+//       bumpMap: hair_pbr,
+//       side: THREE.DoubleSide
+// });
+
+// let hair;
+// loader.load('models/gingerhair.obj',(object) => {
+//         // Create realistic body material
+//         const bodyMaterial = new THREE.MeshPhongMaterial({
+//             color: 0xe6bc98,
+//             specular: 0x111111,
+//             shininess: 50,
+//             side: THREE.DoubleSide
+//         });
+
+//         object.traverse((child) => {
+//             if (child.isMesh) {
+//                 child.material = hair_material;
+//                 child.castShadow = true;
+//                 child.receiveShadow = true;
+
+//                 // Compute normals for proper lighting
+//                 child.geometry.computeVertexNormals();
+//             }
+//         });
+
+
+//         hair = object;
+//         scene.add(hair);
+
+//         let hairscale = 0.5;
+
+//         let hairt = translationMatrix(-2.5, 4, -7.8);
+
+//         let hairs = scaleMatrix(hairscale, hairscale, hairscale);
+//         let hairrot = rotationMatrixX(-90);
+//         let hairtransform = new THREE.Matrix4();
+
+//         hairtransform.multiplyMatrices(hairs, hairtransform);
+//         hairtransform.multiplyMatrices(hairrot, hairtransform);
+//         hairtransform.multiplyMatrices(hairt, hairtransform);
+
+//         hair.applyMatrix4(hairtransform)
+
+//         console.log('hair loaded successfully!');
+
+//         if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
+//             console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+//         }
+//     }, (xhr) => {
+//         console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+//     }, (error) => {
+//         console.error('Error loading hair model:', error);
+//     }
+// );
+
+
 //////////////////////////////////
 
 const cardiogram_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
