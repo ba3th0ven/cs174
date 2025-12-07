@@ -25,7 +25,7 @@ camera.position.set(0, 10, 20);
 controls.target.set(0, 0, 0);
 
 const transformControls = new TransformControls(camera, renderer.domElement);
-scene.add(transformControls);
+scene.add(transformControls.getHelper());
 
 // prevent objects from being scaled
 /*
@@ -35,7 +35,6 @@ transformControls.showZ = false;
 */
 
 /////// Canvas for instructions ////////
-// TODO: why is the canvas not showing up brah
 
 // Create a canvas element
 const canvas = document.createElement('canvas');
@@ -92,6 +91,7 @@ function makeIcon(path) {
 let life1 = makeIcon('pictures/heart.png');
 let life2 = makeIcon('pictures/heart.png');
 let life3 = makeIcon('pictures/heart.png');
+let lives = [life1, life2, life3]
 
 life1.position.set(-0.15, 0, 0);
 life2.position.set(0, 0, 0);
@@ -134,6 +134,7 @@ let hovered = null;
 let selected = null;
 let hit = null;
 let dragging = false;
+let hasCollided = false;
 let stage = 'start'; // start, remove, replace, done
 let resetting = false;
 
@@ -548,40 +549,11 @@ const table_material = new THREE.MeshStandardMaterial({
 
 // const table_material = new THREE.MeshPhongMaterial( { color: 0x777b7e, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 const tabletop = new THREE.Mesh( tabletop_geometry, table_material );
-const tabletop_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-tabletop_bbox.setFromObject(tabletop);
-const tabletop_helper = new THREE.Box3Helper( tabletop_bbox, 0xffff00 );
-tabletop.add(tabletop_helper)
-tabletop_helper.visible = false
-
 const leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 7, 32 );
 const leg1 = new THREE.Mesh( leg_geometry, table_material );
-const leg1_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-leg1_bbox.setFromObject(leg1);
-const leg1_helper = new THREE.Box3Helper( leg1_bbox, 0xffff00 );
-leg1.add(leg1_helper)
-leg1_helper.visible = false
-
 const leg2 = new THREE.Mesh( leg_geometry, table_material );
-const leg2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-leg2_bbox.setFromObject(leg2);
-const leg2_helper = new THREE.Box3Helper( leg2_bbox, 0xffff00 );
-leg2.add(leg2_helper)
-leg2_helper.visible = false
-
 const leg3 = new THREE.Mesh( leg_geometry, table_material );
-const leg3_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-leg3_bbox.setFromObject(leg3);
-const leg3_helper = new THREE.Box3Helper( leg3_bbox, 0xffff00 );
-leg3.add(leg3_helper)
-leg2_helper.visible = false
-
 const leg4 = new THREE.Mesh( leg_geometry, table_material );
-const leg4_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-leg4_bbox.setFromObject(leg4);
-const leg4_helper = new THREE.Box3Helper( leg4_bbox, 0xffff00 );
-leg4.add(leg4_helper)
-leg4_helper.visible = false
 
 leg1.castShadow = true;
 leg1.receiveShadow = true;
@@ -617,35 +589,12 @@ const table2_material = new THREE.MeshPhongMaterial( { color: 0x4d6966, ambient:
 
 const table2 = new THREE.Mesh( table2_geo, table2_material );
 scene.add( table2 );
-const table2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-table2_bbox.setFromObject(table2);
-const table2_helper = new THREE.Box3Helper( table2_bbox, 0xffff00 );
-table2.add(table2_helper)
 
 const table2_leg_geometry = new THREE.CylinderGeometry( 0.5, 0.5, 10, 32 );
 const table_leg1 = new THREE.Mesh( table2_leg_geometry, table2_material );
-const table_leg1_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-table_leg1_bbox.setFromObject(table_leg1);
-const table_leg1_helper = new THREE.Box3Helper( table_leg1_bbox, 0xffff00 );
-table_leg1.add(table_leg1_helper)
-
 const table_leg2 = new THREE.Mesh( table2_leg_geometry, table2_material );
-const table_leg2_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-table_leg2_bbox.setFromObject(table_leg2);
-const table_leg2_helper = new THREE.Box3Helper( table_leg2_bbox, 0xffff00 );
-table_leg2.add(table_leg2_helper)
-
 const table_leg3 = new THREE.Mesh( table2_leg_geometry, table2_material );
-const table_leg3_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-table_leg3_bbox.setFromObject(table_leg3);
-const table_leg3_helper = new THREE.Box3Helper( table_leg3_bbox, 0xffff00 );
-table_leg3.add(table_leg3_helper)
-
 const table_leg4 = new THREE.Mesh( table2_leg_geometry, table2_material );
-const table_leg4_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
-table_leg4_bbox.setFromObject(table_leg4);
-const table_leg4_helper = new THREE.Box3Helper( table_leg4_bbox, 0xffff00 );
-table_leg4.add(table_leg4_helper)
 
 table_leg1.position.set(4.5, -5, -9.5);
 table_leg2.position.set(-4.5, -5, -9.5);
@@ -1075,38 +1024,31 @@ const body_normal = textureLoader.load('public/models/skin/skin_0001_normal_dire
 const body_pbr = textureLoader.load('public/models/skin/skin_0001_height_4k.png');
 const body_roughness = textureLoader.load('public/models/skin/skin_0001_roughness_4k.jpg');
 
-
-
-const skin_material = new THREE.MeshStandardMaterial({
-      map: body_diffuse,
-      normalMap: body_normal,
-      roughnessMap: body_roughness,
-      roughness: 1,
-      metalnessMap: body_metallic,
-      metalness: 0.01,  
-      bumpMap: body_pbr,
-      side: THREE.DoubleSide
-});
-
-skin_material.normalMap.wrapS = THREE.RepeatWrapping;
-skin_material.normalMap.wrapT = THREE.RepeatWrapping;
-
-// body_material.normalMap.repeat.set(6, 6); // repeat the texture 4×4 times
-
-skin_material.normalScale.set(0.2, 0.2); 
-
 const body_bbox = new THREE.Box3(new THREE.Vector3(), new THREE.Vector3());
 let body_helper;
 
 let humanbody;
+let humanbody2; 
+
 loader.load('models/final_body.obj',(object) => {
         // Create realistic body material
-        const bodyMaterial = new THREE.MeshPhongMaterial({
-            color: 0xe6bc98,
-            specular: 0x111111,
-            shininess: 50,
+        const skin_material = new THREE.MeshStandardMaterial({
+            map: body_diffuse,
+            normalMap: body_normal,
+            roughnessMap: body_roughness,
+            roughness: 1,
+            metalnessMap: body_metallic,
+            metalness: 0.01,  
+            bumpMap: body_pbr,
             side: THREE.DoubleSide
         });
+
+        skin_material.normalMap.wrapS = THREE.RepeatWrapping;
+        skin_material.normalMap.wrapT = THREE.RepeatWrapping;
+
+        // body_material.normalMap.repeat.set(6, 6); // repeat the texture 4×4 times
+
+        skin_material.normalScale.set(0.2, 0.2); 
 
         object.traverse((child) => {
             if (child.isMesh) {
@@ -1123,10 +1065,6 @@ loader.load('models/final_body.obj',(object) => {
         humanbody = object;
         scene.add(humanbody);
 
-        body_bbox.setFromObject(humanbody);
-        body_helper = new THREE.Box3Helper( body_bbox, 0xffff00 );
-        humanbody.add(body_helper)
-
         let humanscale = 1.3;
 
         let bodyt = translationMatrix(-3, 1.2, -1);
@@ -1139,6 +1077,8 @@ loader.load('models/final_body.obj',(object) => {
 
         humanbody.applyMatrix4(body_transform)
 
+        humanbody.visible = false
+
         console.log('Body loaded successfully!');
 
         if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
@@ -1150,6 +1090,71 @@ loader.load('models/final_body.obj',(object) => {
         console.error('Error loading body model:', error);
     }
 );
+
+
+loader.load('models/c_man.obj',(object) => {
+        // Create realistic body material
+        // Create realistic body material
+        const skin2_material = new THREE.MeshStandardMaterial({
+            map: body_diffuse,
+            normalMap: body_normal,
+            roughnessMap: body_roughness,
+            roughness: 1,
+            metalnessMap: body_metallic,
+            metalness: 0.01,  
+            bumpMap: body_pbr,
+            side: THREE.DoubleSide
+        });
+
+        skin2_material.normalMap.wrapS = THREE.RepeatWrapping;
+        skin2_material.normalMap.wrapT = THREE.RepeatWrapping;
+
+        // body_material.normalMap.repeat.set(6, 6); // repeat the texture 4×4 times
+
+        skin2_material.normalScale.set(0.2, 0.2); 
+
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = skin2_material;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+        humanbody2 = object;
+        scene.add(humanbody2);
+
+        let humanscale = 1.3;
+
+        let bodyt = translationMatrix(-3, 1.2, -1);
+
+        let bodys = scaleMatrix(humanscale, humanscale, humanscale);
+        let body_transform = new THREE.Matrix4();
+
+        body_transform.multiplyMatrices(bodys, body_transform);
+        body_transform.multiplyMatrices(bodyt, body_transform);
+
+        let boundingBox = new THREE.Box3().setFromObject(sourceObject);
+        let sourceSize = new THREE.Vector3();
+        boundingBox.getSize(sourceSize);
+
+        console.log('Body loaded successfully!');
+
+        humanbody2.visible = true
+
+        if (object.children[0] && object.children[0].geometry && object.children[0].geometry.attributes.position) {
+            console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+        }
+    }, (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    }, (error) => {
+        console.error('Error loading body model:', error);
+    }
+);
+
 
 const hair_diffuse = textureLoader.load('public/models/human-head-with-short-hair/source/model/skincolor_diffuse.png');
 const hair_metallic = textureLoader.load('public/models/human-head-with-short-hair/source/model/texture_metallic.png');
@@ -1337,10 +1342,6 @@ loader.load('models/cardiogram.obj',(object) => {
         });
 
         scene.add(object);
-
-        cardiogram_bbox.setFromObject(object);
-        cardiogram_helper = new THREE.Box3Helper( cardiogram_bbox, 0xffff00 );
-        object.add(cardiogram_helper)
 
         let cardscale = 1.7;
 
@@ -1701,6 +1702,7 @@ function detach() {
     controls.enabled = true;
     selected = null;
     dragging = false;
+    console.log('detach')
 }
 
 function resetPositions() {
@@ -1725,7 +1727,6 @@ function onKeyDown(event){
             // moveTool(event.keyCode);
             break;
         case 68: // d for detach
-            console.log('detach');
             detach();
             break;
         case 82: // r for rotate
@@ -1848,6 +1849,14 @@ function deleteObject(object) {
     scene.remove(object)
 }
 
+function loseLife() {
+    if (lives.length > 0) {
+        let life = lives.pop()
+        life.visible = false
+        life = null
+    }
+}
+
 function onObjectChange(event) {
     // 'event.target' is the TransformControls instance
     // 'event.target.object' is the currently attached object
@@ -1866,18 +1875,34 @@ function onObjectChange(event) {
         scene.add(rib_helper)
 
         if (bbox.intersectsBox(rib_bbox)) {
-            console.log('intersection')
-            if (selected.name == 'scalpel') //good 
-            {
-                stage = 'remove';
-                console.log('stab ribcage')
-                ribcage.visible = false;
-                rib_helper.visible = false;
+
+            if (!hasCollided) {
+                hasCollided = true;
+
+                console.log('intersection')
+                if (selected.name == 'scalpel') //good 
+                {
+                    stage = 'remove';
+                    console.log('stab ribcage')
+                    ribcage.visible = false;
+                    rib_helper.visible = false;
+
+                    detach()
+                    console.log(tools.scalpel)
+                    tools.scalpel.mesh.visible = false;
+                    scene.remove(tools.scalpel.mesh)
+                    delete tools.scalpel
+                    hasCollided = false;
+                }
+                else //bad 
+                {
+                    console.log('wrong tool')
+                    loseLife()
+                }
             }
-            else //bad 
-            {
-                console.log('wrong tool')
-            }
+        }
+        else {
+            hasCollided = false;
         }
     } else if (stage == 'remove') // remove heart with tweezers
     {
@@ -1886,21 +1911,34 @@ function onObjectChange(event) {
         scene.add(heart_helper)
 
         if (bbox.intersectsBox(heart_bbox)) {
-            console.log('intersection')
-            if (selected.name == 'tweezers') //good 
-            {
-                stage = 'replace';
-                console.log('removed heart')
-                isFlatlined = !isFlatlined;
-                heart.visible = false;
-                scene.remove(heart_helper)
-                heart_helper = null
+            if (!hasCollided) {
+                hasCollided = true;
+                console.log('intersection')
+                if (selected.name == 'tweezers') //good 
+                {
+                    stage = 'replace';
+                    console.log('removed heart')
+                    isFlatlined = !isFlatlined;
+                    heart.visible = false;
+                    scene.remove(heart_helper)
+                    heart_helper = null
+
+                    detach()
+                    tools.tweezers.mesh.visible = false;
+                    scene.remove(tools.tweezers.mesh)
+                    delete tools.tweezers
+                    hasCollided = false;
+                }
+                else //bad 
+                {
+                    console.log('wrong tool')
+                    loseLife()
+                }
             }
-            else //bad 
-            {
-                console.log('wrong tool')
-            }
-         }
+        }
+        else {
+            hasCollided = false;
+        }
     } else if (stage == 'replace') // replace heart
     {
         rib_bbox.min.set(-3.0, 1.0282559585571287, -5.912026042938233); // Define the minimum coordinates of the box
@@ -1910,27 +1948,75 @@ function onObjectChange(event) {
         rib_helper.visible = true;
 
         if (bbox.intersectsBox(rib_bbox)) {
-            console.log('intersection')
-            if (selected.name == 'remeshed' || selected.name == 'heart') //good 
-            {
-                stage = 'done';
-                console.log('heart replaced')
-                isFlatlined = !isFlatlined;
-                scene.remove(rib_helper)
-                rib_helper = null
+            if (!hasCollided) {
+                hasCollided = true;
+                console.log('intersection')
+                if (selected.name == 'remeshed' || selected.name == 'heart') //good 
+                {
+                    stage = 'sew';
+                    console.log('heart replaced')
+                    isFlatlined = !isFlatlined;
+                    ribcage.visible = true;
+                    //scene.remove(rib_helper)
+                    //rib_helper = null
 
-                // place new heart in ribcage
-                detach();
-                heart.visible = true;
-                scene.remove(heart2)
-                heart2 = null
-                //heart2.position.set(9.52, -1.5, 1.5)
+                    // place new heart in ribcage
+                    detach();
+                    heart.visible = true;
+                    scene.remove(heart2)
+                    heart2 = null
+                    //heart2.position.set(9.52, -1.5, 1.5)
+                }
+                else //bad 
+                {
+                    console.log('wrong tool')
+                    loseLife()
+                }
             }
-            else //bad 
-            {
-                console.log('wrong tool')
+        }
+        else {
+            hasCollided = false;
+        }
+    } else if (stage == 'sew') // sew up chest
+    {
+        rib_bbox.min.set(-3.0, 1.0282559585571287, -5.912026042938233); // Define the minimum coordinates of the box
+        rib_bbox.max.set(-1.11372398376464776, 2.3717719459533697, -0.0895980262756338);   // Define the maximum coordinates of the box
+        let rib_helper = new THREE.Box3Helper( rib_bbox, 0x66FF00 );
+        scene.add(rib_helper)
+        rib_helper.visible = true;
+
+        if (bbox.intersectsBox(rib_bbox)) {
+            if (!hasCollided) {
+                hasCollided = true;
+                console.log('intersection')
+                if (selected.name == 'needle') //good 
+                {
+                    stage = 'done';
+                    console.log('chest sewed up')
+                    rib_helper.visible = false
+                    scene.remove(rib_helper)
+                    rib_helper = null
+
+                    humanbody.visible = false
+                    humanbody2.visible = true
+
+
+                    detach()
+                    tools.needle.mesh.visible = false;
+                    scene.remove(tools.needle.mesh)
+                    delete tools.needle
+                    hasCollided = false;
+                }
+                else //bad 
+                {
+                    console.log('wrong tool')
+                    loseLife()
+                }
             }
-         }
+        }
+        else {
+            hasCollided = false;
+        }
     }
         //return
 }
