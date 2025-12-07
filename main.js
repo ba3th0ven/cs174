@@ -6,6 +6,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshLineGeometry, MeshLineMaterial } from 'meshline';
 
 
+const textureLoader = new THREE.TextureLoader();
+
 const scene = new THREE.Scene();
 let clock = new THREE.Clock();
 
@@ -23,7 +25,7 @@ camera.position.set(0, 10, 20);
 controls.target.set(0, 0, 0);
 
 const transformControls = new TransformControls(camera, renderer.domElement);
-scene.add(transformControls.getHelper());
+scene.add(transformControls);
 
 // prevent objects from being scaled
 /*
@@ -37,16 +39,16 @@ transformControls.showZ = false;
 
 // Create a canvas element
 const canvas = document.createElement('canvas');
-canvas.width = 2048; // Set appropriate dimensions
-canvas.height = 256;
+canvas.width = 8392; // Set appropriate dimensions
+canvas.height = 512;
 const ctx = canvas.getContext('2d');
 
 // Configure and draw text on the canvas
 ctx.fillStyle = 'white';
-ctx.font = '48px sans-serif';
+ctx.font = '400px sans-serif';
 ctx.textAlign = 'center';
 ctx.textBaseline = 'middle';
-ctx.fillText('Click on the correct tools to ', canvas.width / 2, canvas.height / 2);
+ctx.fillText('time remaining:', canvas.width / 2, canvas.height / 2);
 
 // Create a CanvasTexture from the canvas
 const texture = new THREE.CanvasTexture(canvas);
@@ -56,9 +58,73 @@ texture.needsUpdate = true; // Important for dynamic updates
 const material = new THREE.SpriteMaterial({ map: texture });
 const sprite = new THREE.Sprite(material);
 
+// Size the sprite properly
+
+const aspect = canvas.width / canvas.height;
+const ax = aspect / 24;
+const ay = 1.0/24;
+
+const worldHeight = 2;   // choose height in world units
+sprite.scale.set(worldHeight * ax, worldHeight * ay, 1);
+
 // Position and add the sprite to the scene
-sprite.position.set(0, 10, 0); // Adjust position as needed
-scene.add(sprite);
+sprite.position.set(-1.55, -0.85, -3); // Adjust position as needed
+camera.add(sprite);
+scene.add(camera);
+
+
+const hudBox = new THREE.Group();
+
+function makeIcon(path) {
+    const tex = new THREE.TextureLoader().load(path);
+    const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true
+    });
+
+    const s = new THREE.Sprite(mat);
+    const height = 2; // world height you want
+    s.scale.set(height * 1.1 / 18.0, height / 18.0, 1);
+
+    return s;
+}
+
+let life1 = makeIcon('pictures/heart.png');
+let life2 = makeIcon('pictures/heart.png');
+let life3 = makeIcon('pictures/heart.png');
+
+life1.position.set(-0.15, 0, 0);
+life2.position.set(0, 0, 0);
+life3.position.set(0.15, 0, 0);
+
+hudBox.add(life1);
+hudBox.add(life2);
+hudBox.add(life3);
+
+
+
+hudBox.position.set(1.55, -0.8, -3);
+
+camera.add(hudBox);
+scene.add(camera);
+
+// 
+// textureLoader.load('pictures/heart.png', texture => {
+//     const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+//     const spriteHUD = new THREE.Sprite(material);
+
+//     const img = texture.image;
+//     const aspect = img.width / img.height;
+
+//     const height = 2; // world height you want
+//     spriteHUD.scale.set(height * aspect / 18.0, height / 18.0, 1);
+
+//     camera.add(spriteHUD);
+//     scene.add(camera);
+
+//     spriteHUD.position.set(1.5, -0.75, -3);
+
+// });
 
 /////////////// Lights/Rays ///////////////
 
@@ -332,8 +398,6 @@ let wallup = 10;
 const wallgeo = new THREE.BoxGeometry( walllen, 0.2, walllen );
 const wallmaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 
-
-const textureLoader = new THREE.TextureLoader();
 const wall_diffuse = textureLoader.load('public/models/walls/modern-fractured-wallpaper_albedo.png');
 const wall_metallic = textureLoader.load('public/models/walls/modern-fractured-wallpaper_metallic.png');
 const wall_normal = textureLoader.load('public/models/walls/modern-fractured-wallpaper_normal-ogl.png');
@@ -411,6 +475,10 @@ wall_right.applyMatrix4(walltransform);
 
 // floor
 const floorgeo = new THREE.BoxGeometry( 40, 0.2, 40 );
+
+floorgeo.castShadow = true;
+floorgeo.receiveShadow = true;
+
 const floormaterial = new THREE.MeshPhongMaterial( { color: 0xbdbabb, ambient: 0.0, diffusivity: 0.5, specularity: 1.0, smoothness: 40.0 } );
 
 const floor_diffuse = textureLoader.load('public/models/base-white-tile-bl/base-white-tile_albedo.png');
@@ -427,6 +495,8 @@ const floor_material = new THREE.MeshStandardMaterial({
       metalnessMap: floor_metallic,
       metalness: 0.1,  
       bumpMap: floor_pbr,
+      castShadow: true,
+      receiveShadow: true
 });
 
 const floor = new THREE.Mesh( floorgeo, floor_material );
@@ -453,6 +523,8 @@ floor.applyMatrix4(floortransform);
 // Operating table
 const table = new THREE.Group()
 const tabletop_geometry = new THREE.BoxGeometry( 12.7, 1, 23 );
+tabletop_geometry.castShadow = true;
+tabletop_geometry.receiveShadow = true;
 wall_back.add(wall_back_helper);
 
 const table_diffuse = textureLoader.load('public/models/grey-upholstery-bl/grey-upholstery_albedo.png');
@@ -511,10 +583,22 @@ const leg4_helper = new THREE.Box3Helper( leg4_bbox, 0xffff00 );
 leg4.add(leg4_helper)
 leg4_helper.visible = false
 
-leg1.position.set(5.5, -3, -10.5);
-leg2.position.set(-5.5, -3, -10.5);
-leg3.position.set(5.5, -3, 10.5);
-leg4.position.set(-5.5, -3, 10.5);
+leg1.castShadow = true;
+leg1.receiveShadow = true;
+
+leg2.castShadow = true;
+leg2.receiveShadow = true;
+
+leg3.castShadow = true;
+leg3.receiveShadow = true;
+
+leg4.castShadow = true;
+leg4.receiveShadow = true;
+
+leg1.position.set(5.5, -3.1, -10.5);
+leg2.position.set(-5.5, -3.1, -10.5);
+leg3.position.set(5.5, -3.1, 10.5);
+leg4.position.set(-5.5, -3.1, 10.5);
 table.add(tabletop, leg1, leg2, leg3, leg4);
 
 table.position.set(-2.4, 0, -0.5);
@@ -589,6 +673,7 @@ scene.add(light2);
 */
 
 const ambientLight = new THREE.AmbientLight(0x505050);  // Soft white light
+// ambientLight.castShadow = true;
 scene.add(ambientLight);
 
 //////////////////////////////////
@@ -638,6 +723,146 @@ function loadModel(obj, path, material, trans, scale) {
         );
     });
 }
+
+// Load lamp
+let otlamp;
+
+const lamp_diffuse = textureLoader.load('public/models/lamp_whitemetal/Poliigon_ClayCeramicGlossy_5212_AmbientOcclusion.jpg');
+const lamp_metallic = textureLoader.load('public/models/lamp_whitemetal/Poliigon_ClayCeramicGlossy_5212_Metallic.jpg');
+const lamp_normal = textureLoader.load('public/models/lamp_whitemetal/Poliigon_ClayCeramicGlossy_5212_Normal.png');
+const lamp_pbr = textureLoader.load('public/models/lamp_whitemetal/Poliigon_ClayCeramicGlossy_5212_Displacement.tiff');
+const lamp_roughness = textureLoader.load('public/models/lamp_whitemetal/Poliigon_ClayCeramicGlossy_5212_Roughness.jpg');
+
+const lamp_material = new THREE.MeshStandardMaterial({
+      map: lamp_diffuse,
+      normalMap: lamp_normal,
+      roughnessMap: lamp_roughness,
+      roughness: 1,
+      metalnessMap: lamp_metallic,
+      metalness: 0.1,  
+      bumpMap: lamp_pbr,
+});
+
+loader.load(
+    'public/models/lamp_base.obj',
+    (object) => {
+        object.traverse((child) => {
+            if (child.isMesh) {
+                child.material = lamp_material;
+                child.castShadow = true;
+                child.receiveShadow = true;
+
+                // Compute normals for proper lighting
+                child.geometry.computeVertexNormals();
+            }
+        });
+
+        otlamp = object;
+        scene.add(otlamp);
+
+        console.log('ot lamp loaded successfully!');
+        console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+
+        let lscaling = 0.7
+
+        let lampm = translationMatrix(-8, 4.25, -6);
+        let lamp_rot = rotationMatrixZ(-Math.PI);
+        lamp_rot = lamp_rot.multiplyMatrices(lamp_rot, rotationMatrixY(-Math.PI));
+        let lampscale = scaleMatrix(lscaling, lscaling, lscaling);
+        let lamp_transform = new THREE.Matrix4();
+
+        lamp_transform.multiplyMatrices(lampscale, lamp_transform);
+        // lamp_transform.multiplyMatrices(lamp_rot, lamp_transform);
+        lamp_transform.multiplyMatrices(lampm, lamp_transform);
+
+        object.applyMatrix4(lamp_transform)
+    },
+    (xhr) => {
+        console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+    },
+    (error) => {
+        console.error('Error loading ot lamp model:', error);
+    }
+);
+
+// Load lamp bulbs
+
+let bulbmat = new THREE.MeshStandardMaterial({
+      map: lamp_diffuse,
+      normalMap: lamp_normal,
+      roughnessMap: lamp_roughness,
+      roughness: 1,
+      metalnessMap: lamp_metallic,
+      metalness: 0.1,  
+      bumpMap: lamp_pbr,
+});
+
+bulbmat.emissive = new THREE.Color(0xffffaa);
+bulbmat.emissiveIntensity = 1;
+
+function createBulb(onLoad) {
+    let bulb;
+
+    loader.load(
+        'public/models/bulb.obj',
+        (object) => {
+            object.traverse((child) => {
+                if (child.isMesh) {
+                    child.material = bulbmat;
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+
+                    // Compute normals for proper lighting
+                    child.geometry.computeVertexNormals();
+                }
+            });
+
+            bulb = object;
+
+            let bulblight = new THREE.PointLight(0xffffff, 1, 15, 0.001);
+            bulblight.castShadow = true;
+            bulblight.position.set(0, 3, 0);
+            bulb.add(bulblight);
+
+            onLoad(bulb);
+
+            // otlamp.add(bulb);
+
+            console.log('bulb loaded successfully!');
+            console.log('Vertices:', object.children[0].geometry.attributes.position.count);
+        },
+        (xhr) => {
+            console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+        },
+        (error) => {
+            console.error('Error loading bulb model:', error);
+        }
+    );
+}
+
+let shift1 = 4.5;
+let shift2 = shift1 * 0.9;
+
+// make 4 bulbs
+createBulb((bulb) => {
+    otlamp.add(bulb);
+});
+
+createBulb((bulb) => {
+    bulb.position.set(0, 0, shift1);
+    otlamp.add(bulb);
+});
+
+createBulb((bulb) => {
+    bulb.position.set(-shift2 + 0.4, -shift2 + 1.4, 0);
+    otlamp.add(bulb);
+});
+
+createBulb((bulb) => {
+    bulb.position.set(-shift2 + 0.4, -shift2 + 1.4, shift1);
+    otlamp.add(bulb);
+});
+
 
 
 // Heart #1 inside of person
@@ -1279,6 +1504,9 @@ gltf_loader.load(
     'models/tray.glb',
     (gltf) => {
         scene.add(gltf.scene)
+
+        gltf.scene.castShadow = true;
+        gltf.scene.receiveShadow = true;
 
         gltf.scene.scale.setScalar(10);
         gltf.scene.position.set(9.5, -1.65, 2);
